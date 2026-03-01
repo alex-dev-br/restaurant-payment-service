@@ -11,7 +11,7 @@ services:
         volumes:
             - ${POSTGRES_VOLUME_NAME:-pg_payment_data}:/var/lib/postgresql/data
         healthcheck:
-            test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-payment} -d ${POSTGRES_DB:-paymentdb} -h localhost"]
+            test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-payment} -d ${POSTGRES_DB:-paymentdb}"]
             interval: 5s
             timeout: 3s
             retries: 20
@@ -42,8 +42,8 @@ services:
             KAFKA_BROKER_ID: ${KAFKA_BROKER_ID:-1}
             KAFKA_ZOOKEEPER_CONNECT: ${KAFKA_ZOOKEEPER_CONNECT:-zookeeper:2181}
 
-            KAFKA_LISTENERS: ${KAFKA_LISTENERS:-PLAINTEXT://0.0.0.0:9092,PLAINTEXT_INTERNAL://0.0.0.0:29092}
-            KAFKA_ADVERTISED_LISTENERS: ${KAFKA_ADVERTISED_LISTENERS:-PLAINTEXT://localhost:9092,PLAINTEXT_INTERNAL://kafka:29092}
+            KAFKA_LISTENERS: ${KAFKA_LISTENERS:-PLAINTEXT://0.0.0.0:9092,PLAINTEXT_INTERNAL://0.0.0.0:${KAFKA_INTERNAL_PORT:-29092}}
+            KAFKA_ADVERTISED_LISTENERS: ${KAFKA_ADVERTISED_LISTENERS:-PLAINTEXT://localhost:${KAFKA_PORT:-9092},PLAINTEXT_INTERNAL://kafka:${KAFKA_INTERNAL_PORT:-29092}}
             KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: ${KAFKA_LISTENER_SECURITY_PROTOCOL_MAP:-PLAINTEXT:PLAINTEXT,PLAINTEXT_INTERNAL:PLAINTEXT}
             KAFKA_INTER_BROKER_LISTENER_NAME: ${KAFKA_INTER_BROKER_LISTENER_NAME:-PLAINTEXT_INTERNAL}
 
@@ -66,7 +66,7 @@ services:
             - "${KAFKA_UI_PORT:-8088}:8080"
         environment:
             KAFKA_CLUSTERS_0_NAME: ${KAFKA_UI_CLUSTER_NAME:-local}
-            KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: ${KAFKA_UI_BOOTSTRAP_SERVERS:-kafka:29092}
+            KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: ${KAFKA_UI_BOOTSTRAP_SERVERS:-kafka:${KAFKA_INTERNAL_PORT:-29092}}
         restart: unless-stopped
 
 volumes:
