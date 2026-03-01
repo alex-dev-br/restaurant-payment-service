@@ -2,7 +2,7 @@
 
 Microsserviço responsável pelo processamento e persistência de pagamentos no ecossistema **Restaurant FIAP**.
 
-Este serviço foi desenvolvido seguindo boas práticas de arquitetura de microsserviços, versionamento de banco de dados e integração assíncrona.
+Este serviço foi desenvolvido seguindo boas práticas de arquitetura de microsserviços, versionamento de banco de dados, integração assíncrona e organização profissional de configuração de ambientes.
 
 ---
 
@@ -10,12 +10,12 @@ Este serviço foi desenvolvido seguindo boas práticas de arquitetura de micross
 
 O serviço está estruturado como um microsserviço independente com:
 
-- API REST
-- Persistência em PostgreSQL
-- Versionamento de schema com Flyway
-- Comunicação assíncrona via Kafka
-- Healthchecks de infraestrutura
-- Integração contínua com GitHub Actions
+* API REST
+* Persistência em PostgreSQL
+* Versionamento de schema com Flyway
+* Comunicação assíncrona via Kafka
+* Healthchecks de infraestrutura
+* Integração contínua com GitHub Actions
 
 ---
 
@@ -33,15 +33,15 @@ flowchart LR
 
 # 🛠 Stack Tecnológica
 
-- Java 21
-- Spring Boot 4
-- Spring Data JPA
-- PostgreSQL 16
-- Flyway
-- Apache Kafka
-- Docker / Docker Compose
-- GitHub Actions
-- Maven
+* Java 21
+* Spring Boot 4
+* Spring Data JPA
+* PostgreSQL 16
+* Flyway
+* Apache Kafka
+* Docker / Docker Compose
+* GitHub Actions
+* Maven
 
 ---
 
@@ -64,8 +64,54 @@ create table payments (
 create unique index uk_payments_order_id on payments(order_id);
 ```
 
-O schema é gerenciado exclusivamente via **Flyway**
-(`spring.jpa.hibernate.ddl-auto=validate`).
+O schema é gerenciado exclusivamente via **Flyway**.
+
+O Hibernate está configurado apenas para validação:
+
+```
+spring.jpa.hibernate.ddl-auto=validate
+```
+
+---
+
+# ⚙️ Configuração de Ambiente (.env)
+
+O projeto utiliza variáveis de ambiente com fallback tanto no `application.yaml` quanto no `docker-compose.yml`.
+
+## 📌 Arquivos
+
+* `.env` → **não versionado** (configuração local)
+* `.env.example` → **versionado** (modelo para novos ambientes)
+
+## 🔧 Como configurar
+
+1️⃣ Copie o arquivo de exemplo:
+
+```bash
+cp .env.example .env
+```
+
+No Windows:
+
+```bash
+copy .env.example .env
+```
+
+2️⃣ Ajuste as variáveis conforme necessário.
+
+Caso o `.env` não exista, valores padrão serão utilizados automaticamente.
+
+Exemplo de fallback no `application.yaml`:
+
+```yaml
+url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/paymentdb}
+```
+
+Isso garante:
+
+* Execução simples para avaliação
+* Flexibilidade para múltiplos ambientes
+* Organização profissional de configuração
 
 ---
 
@@ -79,8 +125,8 @@ docker compose up -d
 
 Serviços disponíveis:
 
-| Serviço     | Porta |
-|------------|-------|
+| Serviço    | Porta |
+| ---------- | ----- |
 | PostgreSQL | 5432  |
 | Kafka      | 9092  |
 | Kafka UI   | 8088  |
@@ -123,28 +169,9 @@ mvn verify
 
 O pipeline CI executa automaticamente:
 
-- Subida de PostgreSQL
-- Validação Flyway
-- Execução de testes
-
----
-
-# ⚙️ Configuração via Variáveis de Ambiente
-
-O projeto utiliza fallback de variáveis tanto no `application.yaml` quanto no `docker-compose.yml`.
-
-Exemplo:
-
-```yaml
-url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/paymentdb}
-```
-
-Caso nenhuma variável seja definida, valores padrão são utilizados.
-
-Isso garante:
-
-- Execução simples para avaliação
-- Flexibilidade para ambientes futuros
+* Subida de PostgreSQL
+* Validação Flyway
+* Execução de testes
 
 ---
 
@@ -158,10 +185,10 @@ Workflow localizado em:
 
 O pipeline:
 
-- Configura Java 21
-- Sobe PostgreSQL
-- Executa `mvn verify`
-- Garante que migrations e testes estejam válidos
+* Configura Java 21
+* Sobe PostgreSQL
+* Executa `mvn verify`
+* Garante que migrations e testes estejam válidos
 
 ---
 
@@ -181,13 +208,13 @@ src
 
 # 📈 Próximas Evoluções
 
-- Implementação da entidade `Payment`
-- Camada Domain
-- Use Cases
-- Controller REST
-- Publicação de eventos Kafka
-- Testes de integração com Testcontainers
-- Aplicação de princípios de Clean Architecture
+* Implementação da entidade `Payment`
+* Camada Domain
+* Use Cases
+* Controller REST
+* Publicação de eventos Kafka
+* Testes de integração com Testcontainers
+* Aplicação de princípios de Clean Architecture
 
 ---
 
@@ -201,9 +228,9 @@ Projeto desenvolvido como parte do curso:
 
 # 💡 Decisões Técnicas Importantes
 
-- Flyway como fonte única de versionamento de schema
-- Hibernate configurado apenas para validação
-- Kafka configurado com listeners internos e externos
-- Docker Compose parametrizado com fallback de variáveis
-- CI configurado desde o início do projeto
-
+* Flyway como fonte única de versionamento de schema
+* Hibernate configurado apenas para validação
+* Kafka configurado com listeners internos e externos
+* Docker Compose parametrizado com fallback de variáveis
+* Separação adequada entre `.env` e `.env.example`
+* CI configurado desde o início do projeto
