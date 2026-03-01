@@ -16,6 +16,21 @@ jobs:
         runs-on: ubuntu-latest
         timeout-minutes: 15
 
+        services:
+            postgres:
+                image: postgres:16
+                env:
+                    POSTGRES_USER: payment
+                    POSTGRES_PASSWORD: payment
+                    POSTGRES_DB: paymentdb
+                ports:
+                    - 5432:5432
+                options: >-
+                    --health-cmd="pg_isready -U payment -d paymentdb"
+                    --health-interval=5s
+                    --health-timeout=5s
+                    --health-retries=20
+
         steps:
             - name: Checkout
               uses: actions/checkout@v4
@@ -31,4 +46,8 @@ jobs:
               run: chmod +x mvnw
 
             - name: Build + test
+              env:
+                  SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/paymentdb
+                  SPRING_DATASOURCE_USERNAME: payment
+                  SPRING_DATASOURCE_PASSWORD: payment
               run: ./mvnw -B -ntp verify
