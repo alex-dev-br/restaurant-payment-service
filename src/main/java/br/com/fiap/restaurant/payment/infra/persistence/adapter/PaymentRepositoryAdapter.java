@@ -16,10 +16,11 @@ public class PaymentRepositoryAdapter implements PaymentRepositoryGateway {
     private final PaymentPersistenceMapper mapper;
 
     public PaymentRepositoryAdapter(
-            SpringDataPaymentRepository repository
+            SpringDataPaymentRepository repository,
+            PaymentPersistenceMapper mapper
     ) {
         this.repository = repository;
-        this.mapper = new PaymentPersistenceMapper();
+        this.mapper = mapper;
     }
 
     @Override

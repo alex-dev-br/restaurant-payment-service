@@ -25,7 +25,7 @@ class PaymentRepositoryAdapterTest {
     @Test
     void shouldSaveAndFindPaymentByOrderId() {
         PaymentRepositoryAdapter adapter =
-                new PaymentRepositoryAdapter(springDataPaymentRepository);
+                new PaymentRepositoryAdapter(springDataPaymentRepository, new PaymentPersistenceMapper());
 
         UUID orderId = UUID.randomUUID();
 
