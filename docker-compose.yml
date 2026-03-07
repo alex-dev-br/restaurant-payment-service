@@ -16,6 +16,8 @@ services:
             timeout: 3s
             retries: 20
         restart: unless-stopped
+        networks:
+            - fase3net
 
     zookeeper:
         image: ${ZOOKEEPER_IMAGE:-confluentinc/cp-zookeeper:7.6.1}
@@ -29,6 +31,8 @@ services:
             timeout: 3s
             retries: 30
         restart: unless-stopped
+        networks:
+            - fase3net
 
     kafka:
         image: ${KAFKA_IMAGE:-confluentinc/cp-kafka:7.6.1}
@@ -55,6 +59,8 @@ services:
             timeout: 5s
             retries: 30
         restart: unless-stopped
+        networks:
+            - fase3net
 
     kafka-ui:
         image: ${KAFKA_UI_IMAGE:-provectuslabs/kafka-ui:latest}
@@ -68,7 +74,24 @@ services:
             KAFKA_CLUSTERS_0_NAME: ${KAFKA_UI_CLUSTER_NAME:-local}
             KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: ${KAFKA_UI_BOOTSTRAP_SERVERS:-kafka:${KAFKA_INTERNAL_PORT:-29092}}
         restart: unless-stopped
+        networks:
+            - fase3net
+
+    procpag:
+        image: docker.io/erickemprobr/procpag:latest
+        platform: linux/amd64
+        container_name: payment-procpag
+        ports:
+            - "8089:8089"
+        restart: unless-stopped
+        networks:
+            - fase3net
 
 volumes:
     pg_payment_data:
         name: ${POSTGRES_VOLUME_NAME:-pg_payment_data}
+
+networks:
+    fase3net:
+        name: fase3net
+        driver: bridge
