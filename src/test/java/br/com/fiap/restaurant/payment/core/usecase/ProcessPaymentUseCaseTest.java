@@ -40,77 +40,86 @@ class ProcessPaymentUseCaseTest {
     @Test
     void shouldProcessAndApprovePaymentSuccessfully() {
         UUID orderId = UUID.randomUUID();
+        UUID clientId = UUID.randomUUID();
         BigDecimal amount = new BigDecimal("100.00");
 
         when(paymentRepositoryGateway.findByOrderId(orderId)).thenReturn(Optional.empty());
-        when(externalPaymentProcessorGateway.process(orderId, amount)).thenReturn(true);
+        when(externalPaymentProcessorGateway.process(any(UUID.class), eq(clientId), eq(amount))).thenReturn(true);
         when(paymentRepositoryGateway.save(any(Payment.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
 
-        Payment result = processPaymentUseCase.execute(orderId, amount);
+        Payment result = processPaymentUseCase.execute(orderId, clientId, amount);
 
         assertNotNull(result);
         assertEquals(orderId, result.getOrderId());
+        assertEquals(clientId, result.getClientId());
         assertEquals(PaymentStatus.APPROVED, result.getStatus());
 
-        verify(paymentEventPublisherGateway, times(1)).publishPaymentApproved(any(Payment.class));
-        verify(paymentEventPublisherGateway, never()).publishPaymentPending(any(Payment.class));
+        verify(paymentEventPublisherGateway, times(1)).publishApproved(any(Payment.class));
+        verify(paymentEventPublisherGateway, never()).publishPending(any(Payment.class));
     }
 
     @Test
     void shouldMarkPaymentAsPendingWhenExternalProcessorReturnsFalse() {
         UUID orderId = UUID.randomUUID();
+        UUID clientId = UUID.randomUUID();
         BigDecimal amount = new BigDecimal("55.90");
 
         when(paymentRepositoryGateway.findByOrderId(orderId)).thenReturn(Optional.empty());
-        when(externalPaymentProcessorGateway.process(orderId, amount)).thenReturn(false);
+        when(externalPaymentProcessorGateway.process(any(UUID.class), eq(clientId), eq(amount))).thenReturn(false);
         when(paymentRepositoryGateway.save(any(Payment.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
 
-        Payment result = processPaymentUseCase.execute(orderId, amount);
+        Payment result = processPaymentUseCase.execute(orderId, clientId, amount);
 
         assertNotNull(result);
+        assertEquals(orderId, result.getOrderId());
+        assertEquals(clientId, result.getClientId());
         assertEquals(PaymentStatus.PENDING, result.getStatus());
 
-        verify(paymentEventPublisherGateway, never()).publishPaymentApproved(any(Payment.class));
-        verify(paymentEventPublisherGateway, times(1)).publishPaymentPending(any(Payment.class));
+        verify(paymentEventPublisherGateway, never()).publishApproved(any(Payment.class));
+        verify(paymentEventPublisherGateway, times(1)).publishPending(any(Payment.class));
     }
 
     @Test
     void shouldMarkPaymentAsPendingWhenExternalProcessorThrowsException() {
         UUID orderId = UUID.randomUUID();
+        UUID clientId = UUID.randomUUID();
         BigDecimal amount = new BigDecimal("75.00");
 
         when(paymentRepositoryGateway.findByOrderId(orderId)).thenReturn(Optional.empty());
-        when(externalPaymentProcessorGateway.process(orderId, amount))
+        when(externalPaymentProcessorGateway.process(any(UUID.class), eq(clientId), eq(amount)))
                 .thenThrow(new RuntimeException("Serviço indisponível"));
         when(paymentRepositoryGateway.save(any(Payment.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
 
-        Payment result = processPaymentUseCase.execute(orderId, amount);
+        Payment result = processPaymentUseCase.execute(orderId, clientId, amount);
 
         assertNotNull(result);
+        assertEquals(orderId, result.getOrderId());
+        assertEquals(clientId, result.getClientId());
         assertEquals(PaymentStatus.PENDING, result.getStatus());
 
-        verify(paymentEventPublisherGateway, never()).publishPaymentApproved(any(Payment.class));
-        verify(paymentEventPublisherGateway, times(1)).publishPaymentPending(any(Payment.class));
+        verify(paymentEventPublisherGateway, never()).publishApproved(any(Payment.class));
+        verify(paymentEventPublisherGateway, times(1)).publishPending(any(Payment.class));
     }
 
     @Test
     void shouldReturnExistingPaymentWhenOrderAlreadyHasPayment() {
         UUID orderId = UUID.randomUUID();
+        UUID clientId = UUID.randomUUID();
         BigDecimal amount = new BigDecimal("42.00");
-        Payment existingPayment = Payment.createPending(orderId, amount);
+        Payment existingPayment = Payment.createPending(orderId, clientId, amount);
 
         when(paymentRepositoryGateway.findByOrderId(orderId)).thenReturn(Optional.of(existingPayment));
 
-        Payment result = processPaymentUseCase.execute(orderId, amount);
+        Payment result = processPaymentUseCase.execute(orderId, clientId, amount);
 
         assertEquals(existingPayment, result);
 
-        verify(externalPaymentProcessorGateway, never()).process(any(), any());
+        verify(externalPaymentProcessorGateway, never()).process(any(UUID.class), any(UUID.class), any(BigDecimal.class));
         verify(paymentRepositoryGateway, never()).save(any());
-        verify(paymentEventPublisherGateway, never()).publishPaymentApproved(any());
-        verify(paymentEventPublisherGateway, never()).publishPaymentPending(any());
+        verify(paymentEventPublisherGateway, never()).publishApproved(any());
+        verify(paymentEventPublisherGateway, never()).publishPending(any());
     }
 }

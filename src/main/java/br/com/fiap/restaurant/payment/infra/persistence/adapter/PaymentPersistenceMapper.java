@@ -12,6 +12,7 @@ public class PaymentPersistenceMapper {
         return new PaymentEntity(
                 payment.getId(),
                 payment.getOrderId(),
+                payment.getClientId(),
                 payment.getAmount(),
                 payment.getStatus().name(),
                 payment.getCreatedAt(),
@@ -23,6 +24,7 @@ public class PaymentPersistenceMapper {
         return new Payment(
                 entity.getId(),
                 entity.getOrderId(),
+                entity.getClientId(),
                 entity.getAmount(),
                 PaymentStatus.valueOf(entity.getStatus()),
                 entity.getCreatedAt(),

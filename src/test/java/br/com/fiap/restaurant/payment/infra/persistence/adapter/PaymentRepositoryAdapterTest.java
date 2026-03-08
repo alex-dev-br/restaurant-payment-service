@@ -24,18 +24,26 @@ class PaymentRepositoryAdapterTest {
 
     @Test
     void shouldSaveAndFindPaymentByOrderId() {
+
         PaymentRepositoryAdapter adapter =
-                new PaymentRepositoryAdapter(springDataPaymentRepository, new PaymentPersistenceMapper());
+                new PaymentRepositoryAdapter(
+                        springDataPaymentRepository,
+                        new PaymentPersistenceMapper()
+                );
 
         UUID orderId = UUID.randomUUID();
+        UUID clientId = UUID.randomUUID();
+
+        OffsetDateTime now = OffsetDateTime.now();
 
         Payment payment = new Payment(
                 UUID.randomUUID(),
                 orderId,
+                clientId,
                 new BigDecimal("99.90"),
                 PaymentStatus.PENDING,
-                OffsetDateTime.now(),
-                OffsetDateTime.now()
+                now,
+                now
         );
 
         Payment saved = adapter.save(payment);
@@ -43,9 +51,11 @@ class PaymentRepositoryAdapterTest {
 
         assertNotNull(saved);
         assertEquals(orderId, saved.getOrderId());
+        assertEquals(clientId, saved.getClientId());
 
         assertTrue(found.isPresent());
         assertEquals(saved.getId(), found.get().getId());
         assertEquals(PaymentStatus.PENDING, found.get().getStatus());
+        assertEquals(clientId, found.get().getClientId());
     }
 }

@@ -8,16 +8,19 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-public class PaymentTest {
+class PaymentTest {
+
     @Test
     void shouldCreatePendingPaymentSuccessfully() {
         UUID orderId = UUID.randomUUID();
+        UUID clientId = UUID.randomUUID();
         BigDecimal amount = new BigDecimal("89.90");
 
-        Payment payment = Payment.createPending(orderId, amount);
+        Payment payment = Payment.createPending(orderId, clientId, amount);
 
         assertNotNull(payment.getId());
         assertEquals(orderId, payment.getOrderId());
+        assertEquals(clientId, payment.getClientId());
         assertEquals(new BigDecimal("89.90"), payment.getAmount());
         assertEquals(PaymentStatus.PENDING, payment.getStatus());
         assertNotNull(payment.getCreatedAt());
@@ -27,6 +30,7 @@ public class PaymentTest {
     @Test
     void shouldApprovePaymentSuccessfully() {
         Payment payment = new Payment(
+                UUID.randomUUID(),
                 UUID.randomUUID(),
                 UUID.randomUUID(),
                 new BigDecimal("35.50"),
@@ -48,6 +52,7 @@ public class PaymentTest {
                 () -> new Payment(
                         UUID.randomUUID(),
                         UUID.randomUUID(),
+                        UUID.randomUUID(),
                         BigDecimal.ZERO,
                         PaymentStatus.PENDING,
                         OffsetDateTime.now(),
@@ -55,7 +60,7 @@ public class PaymentTest {
                 )
         );
 
-        assertEquals("amount deve ser maior que zero", exception.getMessage());
+        assertEquals("O valor do pagamento deve ser maior que zero.", exception.getMessage());
     }
 
     @Test
@@ -65,6 +70,7 @@ public class PaymentTest {
                 () -> new Payment(
                         UUID.randomUUID(),
                         null,
+                        UUID.randomUUID(),
                         new BigDecimal("10.00"),
                         PaymentStatus.PENDING,
                         OffsetDateTime.now(),
@@ -72,6 +78,24 @@ public class PaymentTest {
                 )
         );
 
-        assertEquals("orderId é obrigatório", exception.getMessage());
+        assertEquals("O identificador do pedido (orderId) é obrigatório.", exception.getMessage());
+    }
+
+    @Test
+    void shouldThrowExceptionWhenClientIdIsNull() {
+        IllegalArgumentException exception = assertThrows(
+                IllegalArgumentException.class,
+                () -> new Payment(
+                        UUID.randomUUID(),
+                        UUID.randomUUID(),
+                        null,
+                        new BigDecimal("10.00"),
+                        PaymentStatus.PENDING,
+                        OffsetDateTime.now(),
+                        OffsetDateTime.now()
+                )
+        );
+
+        assertEquals("O identificador do cliente (clientId) é obrigatório.", exception.getMessage());
     }
 }

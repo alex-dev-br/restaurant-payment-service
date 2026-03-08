@@ -5,5 +5,5 @@ import java.util.UUID;
 
 public interface ExternalPaymentProcessorGateway {
 
-    boolean process(UUID orderId, BigDecimal amount);
+    boolean process(UUID paymentId, UUID clientId, BigDecimal amount);
 }

@@ -24,33 +24,37 @@ public class ProcessPaymentUseCase {
         this.paymentEventPublisherGateway = paymentEventPublisherGateway;
     }
 
-    public Payment execute(UUID orderId, BigDecimal amount) {
+    public Payment execute(UUID orderId, UUID clientId, BigDecimal amount) {
         return paymentRepositoryGateway.findByOrderId(orderId)
-                .orElseGet(() -> createAndProcessPayment(orderId, amount));
+                .orElseGet(() -> createAndProcessPayment(orderId, clientId, amount));
     }
 
-    private Payment createAndProcessPayment(UUID orderId, BigDecimal amount) {
-        Payment payment = Payment.createPending(orderId, amount);
+    private Payment createAndProcessPayment(UUID orderId, UUID clientId, BigDecimal amount) {
+        Payment payment = Payment.createPending(orderId, clientId, amount);
 
         try {
-            boolean approved = externalPaymentProcessorGateway.process(orderId, amount);
+            boolean approved = externalPaymentProcessorGateway.process(
+                    payment.getId(),
+                    payment.getClientId(),
+                    payment.getAmount()
+            );
 
             if (approved) {
                 payment.approve();
                 Payment savedPayment = paymentRepositoryGateway.save(payment);
-                paymentEventPublisherGateway.publishPaymentApproved(savedPayment);
+                paymentEventPublisherGateway.publishApproved(savedPayment);
                 return savedPayment;
             }
 
             payment.markAsPending();
             Payment savedPayment = paymentRepositoryGateway.save(payment);
-            paymentEventPublisherGateway.publishPaymentPending(savedPayment);
+            paymentEventPublisherGateway.publishPending(savedPayment);
             return savedPayment;
 
         } catch (Exception exception) {
             payment.markAsPending();
             Payment savedPayment = paymentRepositoryGateway.save(payment);
-            paymentEventPublisherGateway.publishPaymentPending(savedPayment);
+            paymentEventPublisherGateway.publishPending(savedPayment);
             return savedPayment;
         }
     }

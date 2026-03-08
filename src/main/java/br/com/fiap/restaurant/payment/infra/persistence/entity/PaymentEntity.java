@@ -19,6 +19,9 @@ public class PaymentEntity {
     @Column(name = "order_id", nullable = false, unique = true)
     private UUID orderId;
 
+    @Column(name = "client_id", nullable = false)
+    private UUID clientId;
+
     @Column(nullable = false, precision = 19, scale = 2)
     private BigDecimal amount;
 
@@ -37,6 +40,7 @@ public class PaymentEntity {
     public PaymentEntity(
             UUID id,
             UUID orderId,
+            UUID clientId,
             BigDecimal amount,
             String status,
             OffsetDateTime createdAt,
@@ -44,6 +48,7 @@ public class PaymentEntity {
     ) {
         this.id = id;
         this.orderId = orderId;
+        this.clientId = clientId;
         this.amount = amount;
         this.status = status;
         this.createdAt = createdAt;
@@ -65,6 +70,10 @@ public class PaymentEntity {
     public void setOrderId(UUID orderId) {
         this.orderId = orderId;
     }
+
+    public UUID getClientId() { return clientId; }
+
+    public void setClientId(UUID clientId) { this.clientId = clientId; }
 
     public BigDecimal getAmount() {
         return amount;
