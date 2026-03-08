@@ -26,34 +26,40 @@ public class ProcessPaymentUseCase {
 
     public Payment execute(UUID orderId, UUID clientId, BigDecimal amount) {
         return paymentRepositoryGateway.findByOrderId(orderId)
-                .orElseGet(() -> createAndProcessPayment(orderId, clientId, amount));
+                .orElseGet(() -> createClaimAndProcessPayment(orderId, clientId, amount));
     }
 
-    private Payment createAndProcessPayment(UUID orderId, UUID clientId, BigDecimal amount) {
-        Payment payment = Payment.createPending(orderId, clientId, amount);
+    private Payment createClaimAndProcessPayment(UUID orderId, UUID clientId, BigDecimal amount) {
+        Payment newPayment = Payment.createPending(orderId, clientId, amount);
+
+        Payment claimedPayment = paymentRepositoryGateway.save(newPayment);
+
+        if (!claimedPayment.getId().equals(newPayment.getId())) {
+            return claimedPayment;
+        }
 
         try {
             boolean approved = externalPaymentProcessorGateway.process(
-                    payment.getId(),
-                    payment.getClientId(),
-                    payment.getAmount()
+                    claimedPayment.getId(),
+                    claimedPayment.getClientId(),
+                    claimedPayment.getAmount()
             );
 
             if (approved) {
-                payment.approve();
-                Payment savedPayment = paymentRepositoryGateway.save(payment);
+                claimedPayment.approve();
+                Payment savedPayment = paymentRepositoryGateway.save(claimedPayment);
                 paymentEventPublisherGateway.publishApproved(savedPayment);
                 return savedPayment;
             }
 
-            payment.markAsPending();
-            Payment savedPayment = paymentRepositoryGateway.save(payment);
+            claimedPayment.markAsPending();
+            Payment savedPayment = paymentRepositoryGateway.save(claimedPayment);
             paymentEventPublisherGateway.publishPending(savedPayment);
             return savedPayment;
 
         } catch (Exception exception) {
-            payment.markAsPending();
-            Payment savedPayment = paymentRepositoryGateway.save(payment);
+            claimedPayment.markAsPending();
+            Payment savedPayment = paymentRepositoryGateway.save(claimedPayment);
             paymentEventPublisherGateway.publishPending(savedPayment);
             return savedPayment;
         }
