@@ -4,6 +4,8 @@ import br.com.fiap.restaurant.payment.core.domain.gateway.ExternalPaymentProcess
 import br.com.fiap.restaurant.payment.core.domain.gateway.PaymentEventPublisherGateway;
 import br.com.fiap.restaurant.payment.core.domain.model.Payment;
 import br.com.fiap.restaurant.payment.core.domain.model.PaymentStatus;
+import br.com.fiap.restaurant.payment.infra.persistence.adapter.PaymentPersistenceMapper;
+import br.com.fiap.restaurant.payment.infra.persistence.adapter.PaymentRepositoryAdapter;
 import br.com.fiap.restaurant.payment.infra.persistence.repository.SpringDataPaymentRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -17,14 +19,15 @@ import java.math.BigDecimal;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Import({
         ProcessPaymentUseCaseITConfig.class,
-        br.com.fiap.restaurant.payment.infra.persistence.adapter.PaymentRepositoryAdapter.class,
-        br.com.fiap.restaurant.payment.infra.persistence.adapter.PaymentPersistenceMapper.class
+        PaymentRepositoryAdapter.class,
+        PaymentPersistenceMapper.class
 })
 class ProcessPaymentUseCaseIntegrationTest {
 
@@ -43,6 +46,7 @@ class ProcessPaymentUseCaseIntegrationTest {
     @BeforeEach
     void setUp() {
         springDataPaymentRepository.deleteAll();
+        reset(externalPaymentProcessorGateway, paymentEventPublisherGateway);
     }
 
     @Test
@@ -61,16 +65,52 @@ class ProcessPaymentUseCaseIntegrationTest {
 
         var savedEntity = springDataPaymentRepository.findByOrderId(orderId);
         assertTrue(savedEntity.isPresent());
-        assertEquals("APPROVED", savedEntity.get().getStatus());
+        assertEquals(PaymentStatus.APPROVED.name(), savedEntity.get().getStatus());
         assertEquals(new BigDecimal("120.00"), savedEntity.get().getAmount());
         assertEquals(clientId, savedEntity.get().getClientId());
 
-        verify(paymentEventPublisherGateway, times(1)).publishApproved(any(Payment.class));
-        verify(paymentEventPublisherGateway, never()).publishPending(any(Payment.class));
+        assertEquals(1, springDataPaymentRepository.findAll().size());
+
+        verify(externalPaymentProcessorGateway, times(1))
+                .process(any(UUID.class), eq(clientId), eq(amount));
+        verify(paymentEventPublisherGateway, times(1))
+                .publishApproved(any(Payment.class));
+        verify(paymentEventPublisherGateway, never())
+                .publishPending(any(Payment.class));
     }
 
     @Test
-    void shouldPersistPendingPaymentWhenExternalProcessorFails() {
+    void shouldPersistPendingPaymentWhenExternalProcessorReturnsFalse() {
+        UUID orderId = UUID.randomUUID();
+        UUID clientId = UUID.randomUUID();
+        BigDecimal amount = new BigDecimal("55.90");
+
+        when(externalPaymentProcessorGateway.process(any(UUID.class), eq(clientId), eq(amount)))
+                .thenReturn(false);
+
+        Payment result = processPaymentUseCase.execute(orderId, clientId, amount);
+
+        assertNotNull(result);
+        assertEquals(PaymentStatus.PENDING, result.getStatus());
+
+        var savedEntity = springDataPaymentRepository.findByOrderId(orderId);
+        assertTrue(savedEntity.isPresent());
+        assertEquals(PaymentStatus.PENDING.name(), savedEntity.get().getStatus());
+        assertEquals(new BigDecimal("55.90"), savedEntity.get().getAmount());
+        assertEquals(clientId, savedEntity.get().getClientId());
+
+        assertEquals(1, springDataPaymentRepository.findAll().size());
+
+        verify(externalPaymentProcessorGateway, times(1))
+                .process(any(UUID.class), eq(clientId), eq(amount));
+        verify(paymentEventPublisherGateway, never())
+                .publishApproved(any(Payment.class));
+        verify(paymentEventPublisherGateway, times(1))
+                .publishPending(any(Payment.class));
+    }
+
+    @Test
+    void shouldPersistPendingPaymentWhenExternalProcessorThrowsException() {
         UUID orderId = UUID.randomUUID();
         UUID clientId = UUID.randomUUID();
         BigDecimal amount = new BigDecimal("77.50");
@@ -85,11 +125,50 @@ class ProcessPaymentUseCaseIntegrationTest {
 
         var savedEntity = springDataPaymentRepository.findByOrderId(orderId);
         assertTrue(savedEntity.isPresent());
-        assertEquals("PENDING", savedEntity.get().getStatus());
+        assertEquals(PaymentStatus.PENDING.name(), savedEntity.get().getStatus());
         assertEquals(new BigDecimal("77.50"), savedEntity.get().getAmount());
         assertEquals(clientId, savedEntity.get().getClientId());
 
-        verify(paymentEventPublisherGateway, never()).publishApproved(any(Payment.class));
-        verify(paymentEventPublisherGateway, times(1)).publishPending(any(Payment.class));
+        assertEquals(1, springDataPaymentRepository.findAll().size());
+
+        verify(externalPaymentProcessorGateway, times(1))
+                .process(any(UUID.class), eq(clientId), eq(amount));
+        verify(paymentEventPublisherGateway, never())
+                .publishApproved(any(Payment.class));
+        verify(paymentEventPublisherGateway, times(1))
+                .publishPending(any(Payment.class));
+    }
+
+    @Test
+    void shouldReturnExistingPaymentWhenPaymentAlreadyExistsForOrder() {
+        UUID orderId = UUID.randomUUID();
+        UUID clientId = UUID.randomUUID();
+        BigDecimal amount = new BigDecimal("120.00");
+
+        when(externalPaymentProcessorGateway.process(any(UUID.class), eq(clientId), eq(amount)))
+                .thenReturn(true);
+
+        Payment firstResult = processPaymentUseCase.execute(orderId, clientId, amount);
+        Payment secondResult = processPaymentUseCase.execute(orderId, clientId, amount);
+
+        assertNotNull(firstResult);
+        assertNotNull(secondResult);
+
+        assertEquals(firstResult.getId(), secondResult.getId());
+        assertEquals(PaymentStatus.APPROVED, secondResult.getStatus());
+        assertEquals(1, springDataPaymentRepository.findAll().size());
+
+        var savedEntity = springDataPaymentRepository.findByOrderId(orderId);
+        assertTrue(savedEntity.isPresent());
+        assertEquals(PaymentStatus.APPROVED.name(), savedEntity.get().getStatus());
+        assertEquals(clientId, savedEntity.get().getClientId());
+        assertEquals(amount, savedEntity.get().getAmount());
+
+        verify(externalPaymentProcessorGateway, times(1))
+                .process(any(UUID.class), eq(clientId), eq(amount));
+        verify(paymentEventPublisherGateway, times(1))
+                .publishApproved(any(Payment.class));
+        verify(paymentEventPublisherGateway, never())
+                .publishPending(any(Payment.class));
     }
 }

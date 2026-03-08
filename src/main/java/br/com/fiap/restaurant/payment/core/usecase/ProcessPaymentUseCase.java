@@ -47,7 +47,7 @@ public class ProcessPaymentUseCase {
         Payment newPayment = Payment.createPending(orderId, clientId, amount);
         Payment claimedPayment = paymentRepositoryGateway.save(newPayment);
 
-        if (isClaimedByAnotherFlow(newPayment, claimedPayment)) {
+        if (isConcurrentClaimReuse(newPayment, claimedPayment)) {
             paymentObservabilityGateway.logConcurrentClaimReuse(claimedPayment);
             return claimedPayment;
         }
@@ -55,7 +55,7 @@ public class ProcessPaymentUseCase {
         return processClaimedPayment(claimedPayment);
     }
 
-    private boolean isClaimedByAnotherFlow(Payment newPayment, Payment claimedPayment) {
+    private boolean isConcurrentClaimReuse(Payment newPayment, Payment claimedPayment) {
         return !claimedPayment.getId().equals(newPayment.getId());
     }
 
@@ -106,6 +106,7 @@ public class ProcessPaymentUseCase {
         Payment savedPayment = paymentRepositoryGateway.save(payment);
         paymentEventPublisherGateway.publishPending(savedPayment);
         paymentObservabilityGateway.logExternalError(savedPayment, exception);
+        paymentObservabilityGateway.logPending(savedPayment);
 
         return savedPayment;
     }

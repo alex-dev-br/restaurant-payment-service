@@ -167,10 +167,10 @@ class ProcessPaymentUseCaseTest {
                 .logExternalProcessingStarted(any(Payment.class));
         verify(paymentObservabilityGateway, times(1))
                 .logExternalError(any(Payment.class), any(Exception.class));
+        verify(paymentObservabilityGateway, times(1))
+                .logPending(any(Payment.class));
         verify(paymentObservabilityGateway, never())
                 .logApproved(any(Payment.class));
-        verify(paymentObservabilityGateway, never())
-                .logPending(any(Payment.class));
         verify(paymentObservabilityGateway, never())
                 .logIdempotentReuse(any(Payment.class));
         verify(paymentObservabilityGateway, never())
