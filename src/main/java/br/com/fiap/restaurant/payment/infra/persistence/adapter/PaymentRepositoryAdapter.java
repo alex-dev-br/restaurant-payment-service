@@ -1,6 +1,6 @@
 package br.com.fiap.restaurant.payment.infra.persistence.adapter;
 
-import br.com.fiap.restaurant.payment.core.domain.gateway.PaymentRepositoryGateway;
+import br.com.fiap.restaurant.payment.core.gateway.PaymentRepositoryGateway;
 import br.com.fiap.restaurant.payment.core.domain.model.Payment;
 import br.com.fiap.restaurant.payment.infra.persistence.entity.PaymentEntity;
 import br.com.fiap.restaurant.payment.infra.persistence.repository.SpringDataPaymentRepository;

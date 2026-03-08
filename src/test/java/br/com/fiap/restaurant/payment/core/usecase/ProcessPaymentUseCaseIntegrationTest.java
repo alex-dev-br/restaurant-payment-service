@@ -1,7 +1,7 @@
 package br.com.fiap.restaurant.payment.core.usecase;
 
-import br.com.fiap.restaurant.payment.core.domain.gateway.ExternalPaymentProcessorGateway;
-import br.com.fiap.restaurant.payment.core.domain.gateway.PaymentEventPublisherGateway;
+import br.com.fiap.restaurant.payment.core.gateway.ExternalPaymentProcessorGateway;
+import br.com.fiap.restaurant.payment.core.gateway.PaymentEventPublisherGateway;
 import br.com.fiap.restaurant.payment.core.domain.model.Payment;
 import br.com.fiap.restaurant.payment.core.domain.model.PaymentStatus;
 import br.com.fiap.restaurant.payment.infra.persistence.adapter.PaymentPersistenceMapper;

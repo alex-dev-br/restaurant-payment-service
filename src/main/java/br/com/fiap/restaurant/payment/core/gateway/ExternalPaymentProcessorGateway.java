@@ -1,4 +1,4 @@
-package br.com.fiap.restaurant.payment.core.domain.gateway;
+package br.com.fiap.restaurant.payment.core.gateway;
 
 import java.math.BigDecimal;
 import java.util.UUID;

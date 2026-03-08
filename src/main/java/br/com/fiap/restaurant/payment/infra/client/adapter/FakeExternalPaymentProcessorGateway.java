@@ -1,6 +1,6 @@
 package br.com.fiap.restaurant.payment.infra.client.adapter;
 
-import br.com.fiap.restaurant.payment.core.domain.gateway.ExternalPaymentProcessorGateway;
+import br.com.fiap.restaurant.payment.core.gateway.ExternalPaymentProcessorGateway;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;

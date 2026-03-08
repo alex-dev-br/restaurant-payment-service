@@ -1,6 +1,6 @@
 package br.com.fiap.restaurant.payment.infra.observability.adapter;
 
-import br.com.fiap.restaurant.payment.core.domain.gateway.PaymentObservabilityGateway;
+import br.com.fiap.restaurant.payment.core.gateway.PaymentObservabilityGateway;
 import br.com.fiap.restaurant.payment.core.domain.model.Payment;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;

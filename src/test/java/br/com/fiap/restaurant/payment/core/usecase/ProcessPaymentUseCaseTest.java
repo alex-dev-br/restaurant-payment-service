@@ -1,9 +1,9 @@
 package br.com.fiap.restaurant.payment.core.usecase;
 
-import br.com.fiap.restaurant.payment.core.domain.gateway.ExternalPaymentProcessorGateway;
-import br.com.fiap.restaurant.payment.core.domain.gateway.PaymentEventPublisherGateway;
-import br.com.fiap.restaurant.payment.core.domain.gateway.PaymentObservabilityGateway;
-import br.com.fiap.restaurant.payment.core.domain.gateway.PaymentRepositoryGateway;
+import br.com.fiap.restaurant.payment.core.gateway.ExternalPaymentProcessorGateway;
+import br.com.fiap.restaurant.payment.core.gateway.PaymentEventPublisherGateway;
+import br.com.fiap.restaurant.payment.core.gateway.PaymentObservabilityGateway;
+import br.com.fiap.restaurant.payment.core.gateway.PaymentRepositoryGateway;
 import br.com.fiap.restaurant.payment.core.domain.model.Payment;
 import br.com.fiap.restaurant.payment.core.domain.model.PaymentStatus;
 import org.junit.jupiter.api.BeforeEach;

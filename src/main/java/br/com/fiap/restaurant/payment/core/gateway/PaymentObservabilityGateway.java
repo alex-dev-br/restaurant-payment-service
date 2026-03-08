@@ -1,4 +1,4 @@
-package br.com.fiap.restaurant.payment.core.domain.gateway;
+package br.com.fiap.restaurant.payment.core.gateway;
 
 import br.com.fiap.restaurant.payment.core.domain.model.Payment;
 
