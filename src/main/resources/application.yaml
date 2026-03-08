@@ -18,9 +18,18 @@ spring:
 
   kafka:
     bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
     consumer:
       group-id: ${SPRING_KAFKA_CONSUMER_GROUP_ID:payment-service}
       auto-offset-reset: ${SPRING_KAFKA_CONSUMER_AUTO_OFFSET_RESET:earliest}
+
+app:
+  kafka:
+    topics:
+      payment-approved: pagamento.aprovado
+      payment-pending: pagamento.pendente
 
 server:
   port: ${SERVER_PORT:8083}
