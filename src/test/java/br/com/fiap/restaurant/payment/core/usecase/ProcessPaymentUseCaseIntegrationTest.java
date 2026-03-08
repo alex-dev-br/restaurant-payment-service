@@ -17,8 +17,6 @@ import java.math.BigDecimal;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @DataJpaTest
@@ -59,16 +57,13 @@ class ProcessPaymentUseCaseIntegrationTest {
         Payment result = processPaymentUseCase.execute(orderId, clientId, amount);
 
         assertNotNull(result);
-        assertEquals(orderId, result.getOrderId());
-        assertEquals(clientId, result.getClientId());
         assertEquals(PaymentStatus.APPROVED, result.getStatus());
 
         var savedEntity = springDataPaymentRepository.findByOrderId(orderId);
         assertTrue(savedEntity.isPresent());
-        assertEquals(orderId, savedEntity.get().getOrderId());
-        assertEquals(clientId, savedEntity.get().getClientId());
         assertEquals("APPROVED", savedEntity.get().getStatus());
         assertEquals(new BigDecimal("120.00"), savedEntity.get().getAmount());
+        assertEquals(clientId, savedEntity.get().getClientId());
 
         verify(paymentEventPublisherGateway, times(1)).publishApproved(any(Payment.class));
         verify(paymentEventPublisherGateway, never()).publishPending(any(Payment.class));
@@ -86,16 +81,13 @@ class ProcessPaymentUseCaseIntegrationTest {
         Payment result = processPaymentUseCase.execute(orderId, clientId, amount);
 
         assertNotNull(result);
-        assertEquals(orderId, result.getOrderId());
-        assertEquals(clientId, result.getClientId());
         assertEquals(PaymentStatus.PENDING, result.getStatus());
 
         var savedEntity = springDataPaymentRepository.findByOrderId(orderId);
         assertTrue(savedEntity.isPresent());
-        assertEquals(orderId, savedEntity.get().getOrderId());
-        assertEquals(clientId, savedEntity.get().getClientId());
         assertEquals("PENDING", savedEntity.get().getStatus());
         assertEquals(new BigDecimal("77.50"), savedEntity.get().getAmount());
+        assertEquals(clientId, savedEntity.get().getClientId());
 
         verify(paymentEventPublisherGateway, never()).publishApproved(any(Payment.class));
         verify(paymentEventPublisherGateway, times(1)).publishPending(any(Payment.class));

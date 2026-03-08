@@ -26,14 +26,20 @@ public class PaymentRepositoryAdapter implements PaymentRepositoryGateway {
 
     @Override
     public Payment save(Payment payment) {
+        PaymentEntity entity = mapper.toEntity(payment);
+
         try {
-            PaymentEntity entity = mapper.toEntity(payment);
             PaymentEntity savedEntity = repository.save(entity);
             return mapper.toDomain(savedEntity);
+
         } catch (DataIntegrityViolationException exception) {
             return repository.findByOrderId(payment.getOrderId())
                     .map(mapper::toDomain)
-                    .orElseThrow(() -> exception);
+                    .orElseThrow(() -> new IllegalStateException(
+                            "Falha ao salvar pagamento e nenhum pagamento existente foi encontrado para o orderId: "
+                                    + payment.getOrderId(),
+                            exception
+                    ));
         }
     }
 
