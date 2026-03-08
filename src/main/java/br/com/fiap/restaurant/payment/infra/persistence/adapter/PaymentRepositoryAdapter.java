@@ -4,6 +4,7 @@ import br.com.fiap.restaurant.payment.core.domain.gateway.PaymentRepositoryGatew
 import br.com.fiap.restaurant.payment.core.domain.model.Payment;
 import br.com.fiap.restaurant.payment.infra.persistence.entity.PaymentEntity;
 import br.com.fiap.restaurant.payment.infra.persistence.repository.SpringDataPaymentRepository;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Component;
 
 import java.util.Optional;
@@ -25,9 +26,15 @@ public class PaymentRepositoryAdapter implements PaymentRepositoryGateway {
 
     @Override
     public Payment save(Payment payment) {
-        PaymentEntity entity = mapper.toEntity(payment);
-        PaymentEntity savedEntity = repository.save(entity);
-        return mapper.toDomain(savedEntity);
+        try {
+            PaymentEntity entity = mapper.toEntity(payment);
+            PaymentEntity savedEntity = repository.save(entity);
+            return mapper.toDomain(savedEntity);
+        } catch (DataIntegrityViolationException exception) {
+            return repository.findByOrderId(payment.getOrderId())
+                    .map(mapper::toDomain)
+                    .orElseThrow(() -> exception);
+        }
     }
 
     @Override
