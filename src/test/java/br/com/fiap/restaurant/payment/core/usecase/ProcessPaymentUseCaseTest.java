@@ -12,6 +12,7 @@ import org.junit.jupiter.api.Test;
 import java.math.BigDecimal;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.function.Supplier;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -35,7 +36,7 @@ class ProcessPaymentUseCaseTest {
 
         when(paymentObservabilityGateway.measureProcessing(any()))
                 .thenAnswer(invocation -> {
-                    java.util.function.Supplier<?> supplier = invocation.getArgument(0);
+                    Supplier<?> supplier = invocation.getArgument(0);
                     return supplier.get();
                 });
 
@@ -71,6 +72,23 @@ class ProcessPaymentUseCaseTest {
                 .process(any(UUID.class), eq(clientId), eq(amount));
         verify(paymentEventPublisherGateway, times(1)).publishApproved(any(Payment.class));
         verify(paymentEventPublisherGateway, never()).publishPending(any(Payment.class));
+
+        verify(paymentObservabilityGateway, times(1))
+                .measureProcessing(any());
+        verify(paymentObservabilityGateway, times(1))
+                .logProcessingStarted(orderId, clientId, amount);
+        verify(paymentObservabilityGateway, times(1))
+                .logExternalProcessingStarted(any(Payment.class));
+        verify(paymentObservabilityGateway, times(1))
+                .logApproved(any(Payment.class));
+        verify(paymentObservabilityGateway, never())
+                .logPending(any(Payment.class));
+        verify(paymentObservabilityGateway, never())
+                .logExternalError(any(Payment.class), any(Exception.class));
+        verify(paymentObservabilityGateway, never())
+                .logIdempotentReuse(any(Payment.class));
+        verify(paymentObservabilityGateway, never())
+                .logConcurrentClaimReuse(any(Payment.class));
     }
 
     @Test
@@ -97,6 +115,23 @@ class ProcessPaymentUseCaseTest {
                 .process(any(UUID.class), eq(clientId), eq(amount));
         verify(paymentEventPublisherGateway, never()).publishApproved(any(Payment.class));
         verify(paymentEventPublisherGateway, times(1)).publishPending(any(Payment.class));
+
+        verify(paymentObservabilityGateway, times(1))
+                .measureProcessing(any());
+        verify(paymentObservabilityGateway, times(1))
+                .logProcessingStarted(orderId, clientId, amount);
+        verify(paymentObservabilityGateway, times(1))
+                .logExternalProcessingStarted(any(Payment.class));
+        verify(paymentObservabilityGateway, times(1))
+                .logPending(any(Payment.class));
+        verify(paymentObservabilityGateway, never())
+                .logApproved(any(Payment.class));
+        verify(paymentObservabilityGateway, never())
+                .logExternalError(any(Payment.class), any(Exception.class));
+        verify(paymentObservabilityGateway, never())
+                .logIdempotentReuse(any(Payment.class));
+        verify(paymentObservabilityGateway, never())
+                .logConcurrentClaimReuse(any(Payment.class));
     }
 
     @Test
@@ -123,6 +158,23 @@ class ProcessPaymentUseCaseTest {
                 .process(any(UUID.class), eq(clientId), eq(amount));
         verify(paymentEventPublisherGateway, never()).publishApproved(any(Payment.class));
         verify(paymentEventPublisherGateway, times(1)).publishPending(any(Payment.class));
+
+        verify(paymentObservabilityGateway, times(1))
+                .measureProcessing(any());
+        verify(paymentObservabilityGateway, times(1))
+                .logProcessingStarted(orderId, clientId, amount);
+        verify(paymentObservabilityGateway, times(1))
+                .logExternalProcessingStarted(any(Payment.class));
+        verify(paymentObservabilityGateway, times(1))
+                .logExternalError(any(Payment.class), any(Exception.class));
+        verify(paymentObservabilityGateway, never())
+                .logApproved(any(Payment.class));
+        verify(paymentObservabilityGateway, never())
+                .logPending(any(Payment.class));
+        verify(paymentObservabilityGateway, never())
+                .logIdempotentReuse(any(Payment.class));
+        verify(paymentObservabilityGateway, never())
+                .logConcurrentClaimReuse(any(Payment.class));
     }
 
     @Test
@@ -143,6 +195,23 @@ class ProcessPaymentUseCaseTest {
         verify(paymentRepositoryGateway, never()).save(any());
         verify(paymentEventPublisherGateway, never()).publishApproved(any());
         verify(paymentEventPublisherGateway, never()).publishPending(any());
+
+        verify(paymentObservabilityGateway, times(1))
+                .measureProcessing(any());
+        verify(paymentObservabilityGateway, times(1))
+                .logProcessingStarted(orderId, clientId, amount);
+        verify(paymentObservabilityGateway, times(1))
+                .logIdempotentReuse(existingPayment);
+        verify(paymentObservabilityGateway, never())
+                .logConcurrentClaimReuse(any(Payment.class));
+        verify(paymentObservabilityGateway, never())
+                .logExternalProcessingStarted(any(Payment.class));
+        verify(paymentObservabilityGateway, never())
+                .logApproved(any(Payment.class));
+        verify(paymentObservabilityGateway, never())
+                .logPending(any(Payment.class));
+        verify(paymentObservabilityGateway, never())
+                .logExternalError(any(Payment.class), any(Exception.class));
     }
 
     @Test
@@ -151,15 +220,15 @@ class ProcessPaymentUseCaseTest {
         UUID clientId = UUID.randomUUID();
         BigDecimal amount = new BigDecimal("50.00");
 
-        Payment existingPayment = Payment.createPending(orderId, clientId, amount);
+        Payment claimedByAnotherFlow = Payment.createPending(orderId, clientId, amount);
 
         when(paymentRepositoryGateway.findByOrderId(orderId)).thenReturn(Optional.empty());
-        when(paymentRepositoryGateway.save(any(Payment.class))).thenReturn(existingPayment);
+        when(paymentRepositoryGateway.save(any(Payment.class))).thenReturn(claimedByAnotherFlow);
 
         Payment result = processPaymentUseCase.execute(orderId, clientId, amount);
 
         assertNotNull(result);
-        assertEquals(existingPayment.getId(), result.getId());
+        assertEquals(claimedByAnotherFlow.getId(), result.getId());
         assertEquals(orderId, result.getOrderId());
         assertEquals(clientId, result.getClientId());
         assertEquals(PaymentStatus.PENDING, result.getStatus());
@@ -169,5 +238,22 @@ class ProcessPaymentUseCaseTest {
                 .process(any(UUID.class), any(UUID.class), any(BigDecimal.class));
         verify(paymentEventPublisherGateway, never()).publishApproved(any());
         verify(paymentEventPublisherGateway, never()).publishPending(any());
+
+        verify(paymentObservabilityGateway, times(1))
+                .measureProcessing(any());
+        verify(paymentObservabilityGateway, times(1))
+                .logProcessingStarted(orderId, clientId, amount);
+        verify(paymentObservabilityGateway, times(1))
+                .logConcurrentClaimReuse(any(Payment.class));
+        verify(paymentObservabilityGateway, never())
+                .logIdempotentReuse(any(Payment.class));
+        verify(paymentObservabilityGateway, never())
+                .logExternalProcessingStarted(any(Payment.class));
+        verify(paymentObservabilityGateway, never())
+                .logApproved(any(Payment.class));
+        verify(paymentObservabilityGateway, never())
+                .logPending(any(Payment.class));
+        verify(paymentObservabilityGateway, never())
+                .logExternalError(any(Payment.class), any(Exception.class));
     }
 }

@@ -33,53 +33,80 @@ public class ProcessPaymentUseCase {
             paymentObservabilityGateway.logProcessingStarted(orderId, clientId, amount);
 
             return paymentRepositoryGateway.findByOrderId(orderId)
-                    .map(existingPayment -> {
-                        paymentObservabilityGateway.logIdempotentReuse(existingPayment);
-                        return existingPayment;
-                    })
-                    .orElseGet(() -> createClaimAndProcessPayment(orderId, clientId, amount));
+                    .map(this::reuseExistingPayment)
+                    .orElseGet(() -> claimAndProcessPayment(orderId, clientId, amount));
         });
     }
 
-    private Payment createClaimAndProcessPayment(UUID orderId, UUID clientId, BigDecimal amount) {
-        Payment newPayment = Payment.createPending(orderId, clientId, amount);
+    private Payment reuseExistingPayment(Payment existingPayment) {
+        paymentObservabilityGateway.logIdempotentReuse(existingPayment);
+        return existingPayment;
+    }
 
+    private Payment claimAndProcessPayment(UUID orderId, UUID clientId, BigDecimal amount) {
+        Payment newPayment = Payment.createPending(orderId, clientId, amount);
         Payment claimedPayment = paymentRepositoryGateway.save(newPayment);
 
-        if (!claimedPayment.getId().equals(newPayment.getId())) {
+        if (isClaimedByAnotherFlow(newPayment, claimedPayment)) {
             paymentObservabilityGateway.logConcurrentClaimReuse(claimedPayment);
             return claimedPayment;
         }
 
+        return processClaimedPayment(claimedPayment);
+    }
+
+    private boolean isClaimedByAnotherFlow(Payment newPayment, Payment claimedPayment) {
+        return !claimedPayment.getId().equals(newPayment.getId());
+    }
+
+    private Payment processClaimedPayment(Payment payment) {
         try {
-            paymentObservabilityGateway.logExternalProcessingStarted(claimedPayment);
+            paymentObservabilityGateway.logExternalProcessingStarted(payment);
 
             boolean approved = externalPaymentProcessorGateway.process(
-                    claimedPayment.getId(),
-                    claimedPayment.getClientId(),
-                    claimedPayment.getAmount()
+                    payment.getId(),
+                    payment.getClientId(),
+                    payment.getAmount()
             );
 
             if (approved) {
-                claimedPayment.approve();
-                Payment savedPayment = paymentRepositoryGateway.save(claimedPayment);
-                paymentEventPublisherGateway.publishApproved(savedPayment);
-                paymentObservabilityGateway.logApproved(savedPayment);
-                return savedPayment;
+                return approvePayment(payment);
             }
 
-            claimedPayment.markAsPending();
-            Payment savedPayment = paymentRepositoryGateway.save(claimedPayment);
-            paymentEventPublisherGateway.publishPending(savedPayment);
-            paymentObservabilityGateway.logPending(savedPayment);
-            return savedPayment;
+            return keepPaymentPending(payment);
 
         } catch (Exception exception) {
-            claimedPayment.markAsPending();
-            Payment savedPayment = paymentRepositoryGateway.save(claimedPayment);
-            paymentEventPublisherGateway.publishPending(savedPayment);
-            paymentObservabilityGateway.logExternalError(savedPayment, exception);
-            return savedPayment;
+            return handleProcessingError(payment, exception);
         }
+    }
+
+    private Payment approvePayment(Payment payment) {
+        payment.approve();
+
+        Payment savedPayment = paymentRepositoryGateway.save(payment);
+        paymentEventPublisherGateway.publishApproved(savedPayment);
+        paymentObservabilityGateway.logApproved(savedPayment);
+
+        return savedPayment;
+    }
+
+    private Payment keepPaymentPending(Payment payment) {
+        payment.markAsPending();
+
+        Payment savedPayment = paymentRepositoryGateway.save(payment);
+        paymentEventPublisherGateway.publishPending(savedPayment);
+        paymentObservabilityGateway.logPending(savedPayment);
+
+        return savedPayment;
+    }
+
+    private Payment handleProcessingError(Payment payment, Exception exception) {
+        payment.markAsPending();
+
+        Payment savedPayment = paymentRepositoryGateway.save(payment);
+        paymentEventPublisherGateway.publishPending(savedPayment);
+        paymentObservabilityGateway.logExternalError(savedPayment, exception);
+
+        return savedPayment;
     }
 }
