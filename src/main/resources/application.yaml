@@ -52,6 +52,8 @@ app:
     exchange: payment.exchange
     payment-approved-routing-key: pagamento.aprovado
     payment-pending-routing-key: pagamento.pendente
+    approved-debug-queue: payment.approved.debug.queue
+    pending-debug-queue: payment.pending.debug.queue
 
 server:
   port: ${SERVER_PORT:8083}

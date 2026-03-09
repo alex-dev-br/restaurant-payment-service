@@ -8,6 +8,8 @@ public class RabbitProperties {
     private String exchange;
     private String paymentApprovedRoutingKey;
     private String paymentPendingRoutingKey;
+    private String approvedDebugQueue;
+    private String pendingDebugQueue;
 
     public String getExchange() {
         return exchange;
@@ -31,5 +33,21 @@ public class RabbitProperties {
 
     public void setPaymentPendingRoutingKey(String paymentPendingRoutingKey) {
         this.paymentPendingRoutingKey = paymentPendingRoutingKey;
+    }
+
+    public String getApprovedDebugQueue() {
+        return approvedDebugQueue;
+    }
+
+    public void setApprovedDebugQueue(String approvedDebugQueue) {
+        this.approvedDebugQueue = approvedDebugQueue;
+    }
+
+    public String getPendingDebugQueue() {
+        return pendingDebugQueue;
+    }
+
+    public void setPendingDebugQueue(String pendingDebugQueue) {
+        this.pendingDebugQueue = pendingDebugQueue;
     }
 }
