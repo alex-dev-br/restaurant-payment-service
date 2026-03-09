@@ -2,6 +2,9 @@ spring:
   application:
     name: ${SPRING_APPLICATION_NAME:payment-service}
 
+  profiles:
+    active: rabbit
+
   datasource:
     url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/paymentdb}
     username: ${SPRING_DATASOURCE_USERNAME:payment}
@@ -32,12 +35,23 @@ spring:
         spring.json.trusted.packages: "br.com.fiap.restaurant.payment.infra.messaging.inbound.dto"
         spring.json.value.default.type: "br.com.fiap.restaurant.payment.infra.messaging.inbound.dto.OrderCreatedMessage"
 
+  rabbitmq:
+    host: localhost
+    port: 5672
+    username: guest
+    password: guest
+
 app:
   kafka:
     topics:
       order-created: pedido.criado
       payment-approved: pagamento.aprovado
       payment-pending: pagamento.pendente
+
+  rabbit:
+    exchange: payment.exchange
+    payment-approved-routing-key: pagamento.aprovado
+    payment-pending-routing-key: pagamento.pendente
 
 server:
   port: ${SERVER_PORT:8083}

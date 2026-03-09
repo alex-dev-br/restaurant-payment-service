@@ -2,10 +2,12 @@ package br.com.fiap.restaurant.payment.infra.messaging.inbound.consumer;
 
 import br.com.fiap.restaurant.payment.core.usecase.ProcessPaymentUseCase;
 import br.com.fiap.restaurant.payment.infra.messaging.inbound.dto.OrderCreatedMessage;
+import org.springframework.context.annotation.Profile;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 
 @Component
+@Profile("kafka")
 public class OrderCreatedConsumer {
 
     private final ProcessPaymentUseCase processPaymentUseCase;

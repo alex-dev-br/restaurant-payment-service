@@ -2,9 +2,9 @@ package br.com.fiap.restaurant.payment.infra.messaging.outbound.adapter;
 
 import br.com.fiap.restaurant.payment.core.domain.model.Payment;
 import br.com.fiap.restaurant.payment.core.gateway.PaymentEventPublisherGateway;
-import br.com.fiap.restaurant.payment.infra.messaging.config.KafkaTopicsProperties;
+import br.com.fiap.restaurant.payment.infra.messaging.config.RabbitProperties;
 import br.com.fiap.restaurant.payment.infra.messaging.outbound.dto.PaymentEventMessage;
-import br.com.fiap.restaurant.payment.infra.messaging.outbound.producer.PaymentEventProducer;
+import br.com.fiap.restaurant.payment.infra.messaging.outbound.producer.PaymentEventRabbitProducer;
 import org.springframework.context.annotation.Primary;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
@@ -12,33 +12,35 @@ import org.springframework.stereotype.Component;
 import java.time.OffsetDateTime;
 
 @Component
-@Profile("kafka")
-public class KafkaPaymentEventPublisherAdapter implements PaymentEventPublisherGateway {
-    private final PaymentEventProducer paymentEventProducer;
-    private final KafkaTopicsProperties kafkaTopicsProperties;
+@Primary
+@Profile("rabbit")
+public class RabbitPaymentEventPublisherAdapter implements PaymentEventPublisherGateway {
 
-    public KafkaPaymentEventPublisherAdapter(
-            PaymentEventProducer paymentEventProducer,
-            KafkaTopicsProperties kafkaTopicsProperties
+    private final PaymentEventRabbitProducer paymentEventRabbitProducer;
+    private final RabbitProperties rabbitProperties;
+
+    public RabbitPaymentEventPublisherAdapter(
+            PaymentEventRabbitProducer paymentEventRabbitProducer,
+            RabbitProperties rabbitProperties
     ) {
-        this.paymentEventProducer = paymentEventProducer;
-        this.kafkaTopicsProperties = kafkaTopicsProperties;
+        this.paymentEventRabbitProducer = paymentEventRabbitProducer;
+        this.rabbitProperties = rabbitProperties;
     }
 
     @Override
     public void publishApproved(Payment payment) {
-        paymentEventProducer.send(
-                kafkaTopicsProperties.getPaymentApproved(),
-                payment.getOrderId().toString(),
+        paymentEventRabbitProducer.send(
+                rabbitProperties.getExchange(),
+                rabbitProperties.getPaymentApprovedRoutingKey(),
                 toMessage(payment)
         );
     }
 
     @Override
     public void publishPending(Payment payment) {
-        paymentEventProducer.send(
-                kafkaTopicsProperties.getPaymentPending(),
-                payment.getOrderId().toString(),
+        paymentEventRabbitProducer.send(
+                rabbitProperties.getExchange(),
+                rabbitProperties.getPaymentPendingRoutingKey(),
                 toMessage(payment)
         );
     }
@@ -54,5 +56,3 @@ public class KafkaPaymentEventPublisherAdapter implements PaymentEventPublisherG
         );
     }
 }
-
-
