@@ -1,47 +1,181 @@
+
 # 📦 Payment Service – FIAP Restaurant
 
-Microsserviço responsável pelo processamento e persistência de pagamentos no ecossistema **Restaurant FIAP**.
+Microsserviço responsável pelo **processamento de pagamentos** no ecossistema **Restaurant FIAP**.
 
-Este serviço foi desenvolvido seguindo boas práticas de arquitetura de microsserviços, versionamento de banco de dados, integração assíncrona e organização profissional de configuração de ambientes.
+O serviço consome eventos de criação de pedidos, processa o pagamento através de um processador externo e publica eventos informando o resultado do pagamento.
 
----
-
-# 🏗 Visão Arquitetural
-
-O serviço está estruturado como um microsserviço independente com:
-
-* API REST
-* Persistência em PostgreSQL
-* Versionamento de schema com Flyway
-* Comunicação assíncrona via Kafka
-* Healthchecks de infraestrutura
-* Integração contínua com GitHub Actions
+O projeto foi desenvolvido seguindo princípios de **Clean Architecture**, **Event-Driven Architecture** e boas práticas modernas de microsserviços.
 
 ---
 
-## 🔎 Diagrama Simplificado
+# 🏗 Arquitetura
+
+O serviço segue os princípios da **Clean Architecture (Robert C. Martin)**, garantindo:
+
+- baixo acoplamento
+- alta testabilidade
+- independência de frameworks
+- separação clara entre domínio e infraestrutura
+
+As dependências sempre apontam **para o domínio**.
+
+---
+
+## 📐 Clean Architecture Diagram
+
+```mermaid
+flowchart TB
+
+Frameworks[Spring Boot / RabbitMQ / PostgreSQL]
+
+Adapters[Interface Adapters]
+UseCases[Use Cases]
+Entities[Domain Entities]
+
+Frameworks --> Adapters
+Adapters --> UseCases
+UseCases --> Entities
+````
+
+---
+
+# 📡 Arquitetura Orientada a Eventos
+
+O sistema utiliza **mensageria assíncrona** para comunicação entre microsserviços.
 
 ```mermaid
 flowchart LR
-    Client -->|HTTP| PaymentService
-    PaymentService -->|JPA| PostgreSQL
-    PaymentService -->|Publish Event| Kafka
-    Kafka --> OtherServices
+
+OrderService -->|pedido.criado| PaymentService
+PaymentService -->|pagamento.aprovado| RabbitMQ
+PaymentService -->|pagamento.pendente| RabbitMQ
+
+RabbitMQ --> OrderService
+RabbitMQ --> OtherServices
 ```
 
 ---
 
-# 🛠 Stack Tecnológica
+# 🔄 Fluxo de Processamento do Pagamento
 
-* Java 21
-* Spring Boot 4
-* Spring Data JPA
-* PostgreSQL 16
-* Flyway
-* Apache Kafka
-* Docker / Docker Compose
-* GitHub Actions
-* Maven
+```mermaid
+sequenceDiagram
+
+participant OrderService
+participant PaymentService
+participant Processor
+participant Database
+participant RabbitMQ
+
+OrderService->>PaymentService: pedido.criado
+
+PaymentService->>Database: verificar pagamento existente
+
+alt pagamento já existe
+    PaymentService-->>OrderService: reutiliza pagamento (idempotência)
+else novo pagamento
+    PaymentService->>Database: salvar pagamento pendente
+    PaymentService->>Processor: processar pagamento
+    
+    alt pagamento aprovado
+        Processor-->>PaymentService: sucesso
+        PaymentService->>Database: atualizar status
+        PaymentService->>RabbitMQ: pagamento.aprovado
+    else erro ou rejeição
+        Processor-->>PaymentService: falha
+        PaymentService->>Database: manter pendente
+        PaymentService->>RabbitMQ: pagamento.pendente
+    end
+end
+```
+
+---
+
+# 📡 Eventos do Sistema
+
+## Evento Consumido
+
+### `pedido.criado`
+
+```json
+{
+  "orderId": "uuid",
+  "clientId": "uuid",
+  "amount": 120.00
+}
+```
+
+---
+
+## Eventos Publicados
+
+### `pagamento.aprovado`
+
+```json
+{
+  "paymentId": "uuid",
+  "orderId": "uuid",
+  "clientId": "uuid",
+  "amount": 120.00,
+  "status": "APPROVED",
+  "occurredAt": "timestamp"
+}
+```
+
+---
+
+### `pagamento.pendente`
+
+```json
+{
+  "paymentId": "uuid",
+  "orderId": "uuid",
+  "clientId": "uuid",
+  "amount": 120.00,
+  "status": "PENDING",
+  "occurredAt": "timestamp"
+}
+```
+
+---
+
+# 🧠 Regras de Negócio
+
+Fluxo de pagamento:
+
+1️⃣ Recebe evento `pedido.criado`
+
+2️⃣ Verifica se já existe pagamento para o pedido
+(**idempotência por orderId**)
+
+3️⃣ Caso não exista:
+
+* cria pagamento com status `PENDING`
+* chama processador externo
+
+4️⃣ Se aprovado:
+
+* atualiza status para `APPROVED`
+* publica evento `pagamento.aprovado`
+
+5️⃣ Caso ocorra erro ou rejeição:
+
+* mantém pagamento `PENDING`
+* publica evento `pagamento.pendente`
+
+---
+
+# 📊 Observabilidade
+
+O serviço possui integração com **Micrometer** para métricas operacionais.
+
+| Métrica                         | Descrição                     |
+| ------------------------------- | ----------------------------- |
+| payment.approved.total          | total de pagamentos aprovados |
+| payment.pending.total           | total de pagamentos pendentes |
+| payment.idempotent.reused.total | pagamentos reaproveitados     |
+| payment.processing.duration     | tempo de processamento        |
 
 ---
 
@@ -49,99 +183,103 @@ flowchart LR
 
 Migration inicial:
 
-`src/main/resources/db/migration/V1__init.sql`
+```
+src/main/resources/db/migration/V1__init.sql
+```
 
 ```sql
 create table payments (
   id uuid primary key,
   order_id uuid not null,
+  client_id uuid not null,
   status varchar(30) not null,
   amount numeric(19,2) not null,
   created_at timestamptz not null,
   updated_at timestamptz not null
 );
-
-create unique index uk_payments_order_id on payments(order_id);
 ```
 
-O schema é gerenciado exclusivamente via **Flyway**.
-
-O Hibernate está configurado apenas para validação:
+Índices:
 
 ```
-spring.jpa.hibernate.ddl-auto=validate
+uk_payments_order_id
+idx_payments_client_id
 ```
+
+O schema é versionado com **Flyway**.
+
+Hibernate está configurado apenas para **validação**.
 
 ---
 
-# ⚙️ Configuração de Ambiente (.env)
+# 🛠 Stack Tecnológica
 
-O projeto utiliza variáveis de ambiente com fallback tanto no `application.yaml` quanto no `docker-compose.yml`.
+| Tecnologia      | Uso                     |
+| --------------- | ----------------------- |
+| Java 21         | Linguagem               |
+| Spring Boot     | Framework               |
+| Spring Data JPA | Persistência            |
+| PostgreSQL      | Banco de dados          |
+| Flyway          | Versionamento de schema |
+| RabbitMQ        | Mensageria              |
+| Micrometer      | Observabilidade         |
+| Docker          | Containers              |
+| Maven           | Build                   |
+| GitHub Actions  | CI/CD                   |
 
-## 📌 Arquivos
+---
 
-* `.env` → **não versionado** (configuração local)
-* `.env.example` → **versionado** (modelo para novos ambientes)
+# 📂 Estrutura do Projeto
 
-## 🔧 Como configurar
-
-1️⃣ Copie o arquivo de exemplo:
-
-```bash
-cp .env.example .env
 ```
+src/main/java/br/com/fiap/restaurant/payment
 
-No Windows:
+core
+ ├── domain
+ │   └── model
+ ├── gateway
+ └── usecase
 
-```bash
-copy .env.example .env
+infra
+ ├── client
+ ├── config
+ ├── messaging
+ │   ├── inbound
+ │   └── outbound
+ ├── persistence
+ └── observability
 ```
-
-2️⃣ Ajuste as variáveis conforme necessário.
-
-Caso o `.env` não exista, valores padrão serão utilizados automaticamente.
-
-Exemplo de fallback no `application.yaml`:
-
-```yaml
-url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/paymentdb}
-```
-
-Isso garante:
-
-* Execução simples para avaliação
-* Flexibilidade para múltiplos ambientes
-* Organização profissional de configuração
 
 ---
 
 # 🐳 Execução Local
 
-## 1️⃣ Subir infraestrutura
+Subir infraestrutura:
 
-```bash
+```
 docker compose up -d
 ```
 
 Serviços disponíveis:
 
-| Serviço    | Porta |
-| ---------- | ----- |
-| PostgreSQL | 5432  |
-| Kafka      | 9092  |
-| Kafka UI   | 8088  |
+| Serviço                    | Porta |
+| -------------------------- | ----- |
+| PostgreSQL                 | 5432  |
+| RabbitMQ                   | 5672  |
+| RabbitMQ UI                | 15672 |
+| External Payment Processor | 8089  |
 
-Kafka UI:
+RabbitMQ UI:
 
 ```
-http://localhost:8088
+http://localhost:15672
 ```
 
 ---
 
-## 2️⃣ Executar aplicação
+Executar aplicação:
 
-```bash
+```
 mvn spring-boot:run
 ```
 
@@ -157,64 +295,66 @@ http://localhost:8083
 
 Executar testes:
 
-```bash
+```
 mvn test
 ```
 
 Build completo:
 
-```bash
+```
 mvn verify
 ```
-
-O pipeline CI executa automaticamente:
-
-* Subida de PostgreSQL
-* Validação Flyway
-* Execução de testes
 
 ---
 
 # 🔄 Integração Contínua
 
-Workflow localizado em:
+Pipeline localizado em:
 
 ```
 .github/workflows/ci.yml
 ```
 
-O pipeline:
+Etapas do pipeline:
 
-* Configura Java 21
-* Sobe PostgreSQL
-* Executa `mvn verify`
-* Garante que migrations e testes estejam válidos
-
----
-
-# 📂 Estrutura do Projeto
-
-```
-src
- ├── main
- │   ├── java
- │   └── resources
- │        ├── application.yaml
- │        └── db/migration
- └── test
-```
+* setup Java 21
+* subir PostgreSQL
+* executar migrations Flyway
+* executar testes
+* validar build
 
 ---
 
-# 📈 Próximas Evoluções
+# 🧭 Architecture Decision Records
 
-* Implementação da entidade `Payment`
-* Camada Domain
-* Use Cases
-* Controller REST
-* Publicação de eventos Kafka
-* Testes de integração com Testcontainers
-* Aplicação de princípios de Clean Architecture
+## ADR-001 — Clean Architecture
+
+O serviço segue **Clean Architecture** para separar domínio, casos de uso e infraestrutura.
+
+Benefícios:
+
+* baixo acoplamento
+* alta testabilidade
+* facilidade de evolução
+
+---
+
+## ADR-002 — Comunicação Assíncrona
+
+A comunicação entre microsserviços utiliza **RabbitMQ** para garantir:
+
+* desacoplamento
+* resiliência
+* escalabilidade
+
+---
+
+## ADR-003 — Idempotência
+
+Pagamentos são **idempotentes por orderId**, evitando:
+
+* pagamentos duplicados
+* inconsistências em cenários concorrentes
 
 ---
 
@@ -222,15 +362,10 @@ src
 
 Projeto desenvolvido como parte do curso:
 
-**Pós-Graduação em Arquitetura e Desenvolvimento Java – FIAP**
+**FIAP — Pós-Graduação em Arquitetura e Desenvolvimento Java**
 
----
+Tech Challenge – Arquitetura de Microsserviços.
 
-# 💡 Decisões Técnicas Importantes
 
-* Flyway como fonte única de versionamento de schema
-* Hibernate configurado apenas para validação
-* Kafka configurado com listeners internos e externos
-* Docker Compose parametrizado com fallback de variáveis
-* Separação adequada entre `.env` e `.env.example`
-* CI configurado desde o início do projeto
+
+
