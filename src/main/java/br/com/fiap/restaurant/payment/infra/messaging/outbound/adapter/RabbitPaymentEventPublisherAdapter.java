@@ -13,7 +13,6 @@ import java.time.OffsetDateTime;
 
 @Component
 @Primary
-@Profile("rabbit")
 public class RabbitPaymentEventPublisherAdapter implements PaymentEventPublisherGateway {
 
     private final PaymentEventRabbitProducer paymentEventRabbitProducer;
@@ -30,7 +29,7 @@ public class RabbitPaymentEventPublisherAdapter implements PaymentEventPublisher
     @Override
     public void publishApproved(Payment payment) {
         paymentEventRabbitProducer.send(
-                rabbitProperties.getExchange(),
+                rabbitProperties.getPaymentExchange(),
                 rabbitProperties.getPaymentApprovedRoutingKey(),
                 toMessage(payment)
         );
@@ -39,7 +38,7 @@ public class RabbitPaymentEventPublisherAdapter implements PaymentEventPublisher
     @Override
     public void publishPending(Payment payment) {
         paymentEventRabbitProducer.send(
-                rabbitProperties.getExchange(),
+                rabbitProperties.getPaymentExchange(),
                 rabbitProperties.getPaymentPendingRoutingKey(),
                 toMessage(payment)
         );

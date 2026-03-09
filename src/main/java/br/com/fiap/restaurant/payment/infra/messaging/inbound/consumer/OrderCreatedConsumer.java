@@ -1,13 +1,12 @@
 package br.com.fiap.restaurant.payment.infra.messaging.inbound.consumer;
 
+
 import br.com.fiap.restaurant.payment.core.usecase.ProcessPaymentUseCase;
 import br.com.fiap.restaurant.payment.infra.messaging.inbound.dto.OrderCreatedMessage;
-import org.springframework.context.annotation.Profile;
-import org.springframework.kafka.annotation.KafkaListener;
+import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.stereotype.Component;
 
 @Component
-@Profile("kafka")
 public class OrderCreatedConsumer {
 
     private final ProcessPaymentUseCase processPaymentUseCase;
@@ -16,10 +15,7 @@ public class OrderCreatedConsumer {
         this.processPaymentUseCase = processPaymentUseCase;
     }
 
-    @KafkaListener(
-            topics = "${app.kafka.topics.order-created}",
-            groupId = "${spring.kafka.consumer.group-id}"
-    )
+    @RabbitListener(queues = "${app.rabbit.order-created-queue}")
     public void onOrderCreated(OrderCreatedMessage message) {
         processPaymentUseCase.execute(
                 message.orderId(),

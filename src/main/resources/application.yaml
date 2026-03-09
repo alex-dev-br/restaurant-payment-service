@@ -2,9 +2,6 @@ spring:
   application:
     name: ${SPRING_APPLICATION_NAME:payment-service}
 
-  profiles:
-    active: rabbit
-
   datasource:
     url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/paymentdb}
     username: ${SPRING_DATASOURCE_USERNAME:payment}
@@ -14,46 +11,31 @@ spring:
     hibernate:
       ddl-auto: ${SPRING_JPA_HIBERNATE_DDL_AUTO:validate}
     show-sql: ${SPRING_JPA_SHOW_SQL:true}
+    open-in-view: false
 
   flyway:
     enabled: ${SPRING_FLYWAY_ENABLED:true}
     locations: ${SPRING_FLYWAY_LOCATIONS:classpath:db/migration}
 
-  kafka:
-    bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
-
-    producer:
-      key-serializer: org.apache.kafka.common.serialization.StringSerializer
-      value-serializer: org.springframework.kafka.support.serializer.JacksonJsonSerializer
-
-    consumer:
-      group-id: ${SPRING_KAFKA_CONSUMER_GROUP_ID:payment-service}
-      auto-offset-reset: ${SPRING_KAFKA_CONSUMER_AUTO_OFFSET_RESET:earliest}
-      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
-      value-deserializer: org.springframework.kafka.support.serializer.JacksonJsonDeserializer
-      properties:
-        spring.json.trusted.packages: "br.com.fiap.restaurant.payment.infra.messaging.inbound.dto"
-        spring.json.value.default.type: "br.com.fiap.restaurant.payment.infra.messaging.inbound.dto.OrderCreatedMessage"
-
   rabbitmq:
-    host: localhost
-    port: 5672
-    username: guest
-    password: guest
+    host: ${SPRING_RABBITMQ_HOST:localhost}
+    port: ${SPRING_RABBITMQ_PORT:5672}
+    username: ${SPRING_RABBITMQ_USERNAME:guest}
+    password: ${SPRING_RABBITMQ_PASSWORD:guest}
 
 app:
-  kafka:
-    topics:
-      order-created: pedido.criado
-      payment-approved: pagamento.aprovado
-      payment-pending: pagamento.pendente
-
   rabbit:
-    exchange: payment.exchange
-    payment-approved-routing-key: pagamento.aprovado
-    payment-pending-routing-key: pagamento.pendente
-    approved-debug-queue: payment.approved.debug.queue
-    pending-debug-queue: payment.pending.debug.queue
+    order-exchange: ${APP_RABBIT_ORDER_EXCHANGE:order.exchange}
+    payment-exchange: ${APP_RABBIT_PAYMENT_EXCHANGE:payment.exchange}
+
+    order-created-queue: ${APP_RABBIT_ORDER_CREATED_QUEUE:pedido.criado.queue}
+    order-created-routing-key: ${APP_RABBIT_ORDER_CREATED_ROUTING_KEY:pedido.criado}
+
+    payment-approved-routing-key: ${APP_RABBIT_PAYMENT_APPROVED_ROUTING_KEY:pagamento.aprovado}
+    payment-pending-routing-key: ${APP_RABBIT_PAYMENT_PENDING_ROUTING_KEY:pagamento.pendente}
+
+    approved-debug-queue: ${APP_RABBIT_APPROVED_DEBUG_QUEUE:payment.approved.debug.queue}
+    pending-debug-queue: ${APP_RABBIT_PENDING_DEBUG_QUEUE:payment.pending.debug.queue}
 
 server:
   port: ${SERVER_PORT:8083}

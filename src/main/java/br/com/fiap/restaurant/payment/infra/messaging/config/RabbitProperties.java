@@ -5,18 +5,45 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 @ConfigurationProperties(prefix = "app.rabbit")
 public class RabbitProperties {
 
-    private String exchange;
+    private String orderExchange;
+    private String paymentExchange;
+    private String orderCreatedQueue;
+    private String orderCreatedRoutingKey;
     private String paymentApprovedRoutingKey;
     private String paymentPendingRoutingKey;
     private String approvedDebugQueue;
     private String pendingDebugQueue;
 
-    public String getExchange() {
-        return exchange;
+    public String getOrderExchange() {
+        return orderExchange;
     }
 
-    public void setExchange(String exchange) {
-        this.exchange = exchange;
+    public void setOrderExchange(String orderExchange) {
+        this.orderExchange = orderExchange;
+    }
+
+    public String getPaymentExchange() {
+        return paymentExchange;
+    }
+
+    public void setPaymentExchange(String paymentExchange) {
+        this.paymentExchange = paymentExchange;
+    }
+
+    public String getOrderCreatedQueue() {
+        return orderCreatedQueue;
+    }
+
+    public void setOrderCreatedQueue(String orderCreatedQueue) {
+        this.orderCreatedQueue = orderCreatedQueue;
+    }
+
+    public String getOrderCreatedRoutingKey() {
+        return orderCreatedRoutingKey;
+    }
+
+    public void setOrderCreatedRoutingKey(String orderCreatedRoutingKey) {
+        this.orderCreatedRoutingKey = orderCreatedRoutingKey;
     }
 
     public String getPaymentApprovedRoutingKey() {
