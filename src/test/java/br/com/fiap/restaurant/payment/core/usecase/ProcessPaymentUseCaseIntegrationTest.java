@@ -1,9 +1,9 @@
 package br.com.fiap.restaurant.payment.core.usecase;
 
-import br.com.fiap.restaurant.payment.core.gateway.ExternalPaymentProcessorGateway;
-import br.com.fiap.restaurant.payment.core.gateway.PaymentEventPublisherGateway;
 import br.com.fiap.restaurant.payment.core.domain.model.Payment;
 import br.com.fiap.restaurant.payment.core.domain.model.PaymentStatus;
+import br.com.fiap.restaurant.payment.core.gateway.ExternalPaymentProcessorGateway;
+import br.com.fiap.restaurant.payment.core.gateway.PaymentEventPublisherGateway;
 import br.com.fiap.restaurant.payment.infra.persistence.adapter.PaymentPersistenceMapper;
 import br.com.fiap.restaurant.payment.infra.persistence.adapter.PaymentRepositoryAdapter;
 import br.com.fiap.restaurant.payment.infra.persistence.repository.SpringDataPaymentRepository;
@@ -46,7 +46,10 @@ class ProcessPaymentUseCaseIntegrationTest {
     @BeforeEach
     void setUp() {
         springDataPaymentRepository.deleteAll();
-        reset(externalPaymentProcessorGateway, paymentEventPublisherGateway);
+        reset(
+                externalPaymentProcessorGateway,
+                paymentEventPublisherGateway
+        );
     }
 
     @Test

@@ -37,5 +37,11 @@ app:
     approved-debug-queue: ${APP_RABBIT_APPROVED_DEBUG_QUEUE:payment.approved.debug.queue}
     pending-debug-queue: ${APP_RABBIT_PENDING_DEBUG_QUEUE:payment.pending.debug.queue}
 
+  payment:
+    retry:
+      scheduler:
+        enabled: true
+        fixed-delay-ms: 30000
+
 server:
   port: ${SERVER_PORT:8083}

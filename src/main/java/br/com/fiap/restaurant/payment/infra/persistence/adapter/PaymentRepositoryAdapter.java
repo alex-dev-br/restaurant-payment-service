@@ -1,5 +1,6 @@
 package br.com.fiap.restaurant.payment.infra.persistence.adapter;
 
+import br.com.fiap.restaurant.payment.core.domain.model.PaymentStatus;
 import br.com.fiap.restaurant.payment.core.gateway.PaymentRepositoryGateway;
 import br.com.fiap.restaurant.payment.core.domain.model.Payment;
 import br.com.fiap.restaurant.payment.infra.persistence.entity.PaymentEntity;
@@ -7,6 +8,7 @@ import br.com.fiap.restaurant.payment.infra.persistence.repository.SpringDataPay
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Component;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -44,8 +46,23 @@ public class PaymentRepositoryAdapter implements PaymentRepositoryGateway {
     }
 
     @Override
+    public Optional<Payment> findById(UUID id) {
+        return repository.findById(id)
+                .map(mapper::toDomain);
+    }
+
+    @Override
     public Optional<Payment> findByOrderId(UUID orderId) {
         return repository.findByOrderId(orderId)
                 .map(mapper::toDomain);
     }
+
+    @Override
+    public List<Payment> findByStatus(PaymentStatus status) {
+        return repository.findByStatus(status.name())
+                .stream()
+                .map(mapper::toDomain)
+                .toList();
+    }
+
 }
