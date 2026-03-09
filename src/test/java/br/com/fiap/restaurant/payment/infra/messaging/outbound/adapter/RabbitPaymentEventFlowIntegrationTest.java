@@ -6,11 +6,10 @@ import br.com.fiap.restaurant.payment.infra.messaging.config.RabbitProperties;
 import br.com.fiap.restaurant.payment.infra.messaging.outbound.dto.PaymentEventMessage;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.amqp.rabbit.core.RabbitAdmin;
+import org.springframework.amqp.core.AmqpAdmin;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import java.math.BigDecimal;
@@ -24,7 +23,6 @@ import static org.mockito.Mockito.when;
 @SpringBootTest(properties = {
         "spring.rabbitmq.listener.simple.auto-startup=false"
 })
-@ActiveProfiles("rabbit")
 class RabbitPaymentEventFlowIntegrationTest {
 
     @Autowired
@@ -34,7 +32,7 @@ class RabbitPaymentEventFlowIntegrationTest {
     private RabbitTemplate rabbitTemplate;
 
     @Autowired
-    private RabbitAdmin rabbitAdmin;
+    private AmqpAdmin amqpAdmin;
 
     @Autowired
     private RabbitProperties rabbitProperties;
@@ -63,9 +61,8 @@ class RabbitPaymentEventFlowIntegrationTest {
         processPaymentUseCase.execute(orderId, clientId, amount);
 
         PaymentEventMessage approvedMessage =
-                receiveMessage(rabbitProperties.getApprovedDebugQueue(), PaymentEventMessage.class);
+                receiveExpectedMessage(rabbitProperties.getApprovedDebugQueue(), PaymentEventMessage.class);
 
-        assertNotNull(approvedMessage);
         assertNotNull(approvedMessage.paymentId());
         assertEquals(orderId, approvedMessage.orderId());
         assertEquals(clientId, approvedMessage.clientId());
@@ -74,7 +71,7 @@ class RabbitPaymentEventFlowIntegrationTest {
         assertNotNull(approvedMessage.occurredAt());
 
         PaymentEventMessage pendingMessage =
-                receiveMessage(rabbitProperties.getPendingDebugQueue(), PaymentEventMessage.class);
+                receiveUnexpectedMessage(rabbitProperties.getPendingDebugQueue(), PaymentEventMessage.class);
 
         assertNull(pendingMessage);
     }
@@ -94,9 +91,8 @@ class RabbitPaymentEventFlowIntegrationTest {
         processPaymentUseCase.execute(orderId, clientId, amount);
 
         PaymentEventMessage pendingMessage =
-                receiveMessage(rabbitProperties.getPendingDebugQueue(), PaymentEventMessage.class);
+                receiveExpectedMessage(rabbitProperties.getPendingDebugQueue(), PaymentEventMessage.class);
 
-        assertNotNull(pendingMessage);
         assertNotNull(pendingMessage.paymentId());
         assertEquals(orderId, pendingMessage.orderId());
         assertEquals(clientId, pendingMessage.clientId());
@@ -105,7 +101,7 @@ class RabbitPaymentEventFlowIntegrationTest {
         assertNotNull(pendingMessage.occurredAt());
 
         PaymentEventMessage approvedMessage =
-                receiveMessage(rabbitProperties.getApprovedDebugQueue(), PaymentEventMessage.class);
+                receiveUnexpectedMessage(rabbitProperties.getApprovedDebugQueue(), PaymentEventMessage.class);
 
         assertNull(approvedMessage);
     }
@@ -127,9 +123,8 @@ class RabbitPaymentEventFlowIntegrationTest {
         processPaymentUseCase.execute(orderId, clientId, amount);
 
         PaymentEventMessage pendingMessage =
-                receiveMessage(rabbitProperties.getPendingDebugQueue(), PaymentEventMessage.class);
+                receiveExpectedMessage(rabbitProperties.getPendingDebugQueue(), PaymentEventMessage.class);
 
-        assertNotNull(pendingMessage);
         assertNotNull(pendingMessage.paymentId());
         assertEquals(orderId, pendingMessage.orderId());
         assertEquals(clientId, pendingMessage.clientId());
@@ -138,22 +133,37 @@ class RabbitPaymentEventFlowIntegrationTest {
         assertNotNull(pendingMessage.occurredAt());
 
         PaymentEventMessage approvedMessage =
-                receiveMessage(rabbitProperties.getApprovedDebugQueue(), PaymentEventMessage.class);
+                receiveUnexpectedMessage(rabbitProperties.getApprovedDebugQueue(), PaymentEventMessage.class);
 
         assertNull(approvedMessage);
     }
 
     private void purgeQueue(String queueName) {
-        rabbitAdmin.purgeQueue(queueName, true);
+        amqpAdmin.purgeQueue(queueName, true);
     }
 
-    private <T> T receiveMessage(String queueName, Class<T> payloadType) {
+    private <T> T receiveExpectedMessage(String queueName, Class<T> payloadType) {
         Object message = rabbitTemplate.receiveAndConvert(queueName, 5000);
+
+        assertNotNull(message, "Nenhuma mensagem recebida da fila " + queueName);
+        assertTrue(
+                payloadType.isInstance(message),
+                "Mensagem recebida da fila " + queueName + " com tipo inesperado: "
+                        + message.getClass().getName()
+        );
+
+        return payloadType.cast(message);
+    }
+
+    private <T> T receiveUnexpectedMessage(String queueName, Class<T> payloadType) {
+        Object message = rabbitTemplate.receiveAndConvert(queueName, 100);
+
         assertTrue(
                 message == null || payloadType.isInstance(message),
                 "Mensagem recebida da fila " + queueName + " com tipo inesperado: "
                         + (message == null ? "null" : message.getClass().getName())
         );
-        return payloadType.cast(message);
+
+        return message == null ? null : payloadType.cast(message);
     }
 }
