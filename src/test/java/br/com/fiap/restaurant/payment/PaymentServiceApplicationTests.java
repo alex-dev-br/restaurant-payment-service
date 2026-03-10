@@ -5,7 +5,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 
 @SpringBootTest(properties = {
 		"spring.rabbitmq.listener.simple.auto-startup=false",
-		"spring.task.scheduling.enabled=false"
+		"app.payment.retry.scheduler.enabled=false"
 })
 class PaymentServiceApplicationTests {
 

@@ -22,7 +22,7 @@ import static org.mockito.Mockito.when;
 
 @SpringBootTest(properties = {
         "spring.rabbitmq.listener.simple.auto-startup=false",
-        "payment.retry.scheduler.enabled=false"
+        "app.payment.retry.scheduler.enabled=false"
 })
 class RabbitPaymentEventFlowIntegrationTest {
 
