@@ -11,6 +11,7 @@ public class FakeExternalPaymentProcessorGateway implements ExternalPaymentProce
 
     @Override
     public boolean process(UUID paymentId, UUID clientId, BigDecimal amount) {
+
         return true;
     }
 }

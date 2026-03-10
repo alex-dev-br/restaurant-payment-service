@@ -23,6 +23,29 @@ spring:
     username: ${SPRING_RABBITMQ_USERNAME:guest}
     password: ${SPRING_RABBITMQ_PASSWORD:guest}
 
+resilience4j:
+  retry:
+    instances:
+      externalPaymentProcessor:
+        max-attempts: 3
+        wait-duration: 500ms
+        retry-exceptions:
+          - java.lang.RuntimeException
+
+  circuitbreaker:
+    instances:
+      externalPaymentProcessor:
+        sliding-window-size: 10
+        minimum-number-of-calls: 5
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 10s
+        permitted-number-of-calls-in-half-open-state: 3
+
+  timelimiter:
+    instances:
+      externalPaymentProcessor:
+        timeout-duration: 2s
+
 app:
   rabbit:
     order-exchange: ${APP_RABBIT_ORDER_EXCHANGE:order.exchange}
