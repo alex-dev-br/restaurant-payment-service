@@ -31,6 +31,17 @@ jobs:
                     --health-timeout=5s
                     --health-retries=20
 
+            rabbitmq:
+                image: rabbitmq:3.13-management
+                ports:
+                    - 5672:5672
+                    - 15672:15672
+                options: >-
+                    --health-cmd="rabbitmq-diagnostics -q ping"
+                    --health-interval=5s
+                    --health-timeout=5s
+                    --health-retries=20
+
         steps:
             - name: Checkout
               uses: actions/checkout@v4
@@ -50,4 +61,8 @@ jobs:
                   SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/paymentdb
                   SPRING_DATASOURCE_USERNAME: payment
                   SPRING_DATASOURCE_PASSWORD: payment
+                  SPRING_RABBITMQ_HOST: localhost
+                  SPRING_RABBITMQ_PORT: 5672
+                  SPRING_RABBITMQ_USERNAME: guest
+                  SPRING_RABBITMQ_PASSWORD: guest
               run: ./mvnw -B -ntp verify
