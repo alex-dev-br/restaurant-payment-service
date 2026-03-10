@@ -29,8 +29,6 @@ resilience4j:
       externalPaymentProcessor:
         max-attempts: 3
         wait-duration: 500ms
-        retry-exceptions:
-          - java.lang.RuntimeException
 
   circuitbreaker:
     instances:
