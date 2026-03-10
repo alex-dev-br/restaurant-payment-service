@@ -7,7 +7,7 @@ import org.springframework.stereotype.Component;
 
 @Component
 @ConditionalOnProperty(
-        prefix = "payment.retry.scheduler",
+        prefix = "app.payment.retry.scheduler",
         name = "enabled",
         havingValue = "true",
         matchIfMissing = true
@@ -20,7 +20,7 @@ public class PaymentRetryScheduler {
         this.retryPendingPaymentsUseCase = retryPendingPaymentsUseCase;
     }
 
-    @Scheduled(fixedDelayString = "${payment.retry.scheduler.fixed-delay-ms:30000}")
+    @Scheduled(fixedDelayString = "${app.payment.retry.scheduler.fixed-delay-ms:30000}")
     public void retryPendingPayments() {
         retryPendingPaymentsUseCase.execute();
     }

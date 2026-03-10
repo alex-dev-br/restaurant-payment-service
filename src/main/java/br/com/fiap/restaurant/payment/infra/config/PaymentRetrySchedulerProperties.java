@@ -2,7 +2,7 @@ package br.com.fiap.restaurant.payment.infra.config;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
-@ConfigurationProperties(prefix = "payment.retry.scheduler")
+@ConfigurationProperties(prefix = "app.payment.retry.scheduler")
 public class PaymentRetrySchedulerProperties {
 
     private boolean enabled = true;
