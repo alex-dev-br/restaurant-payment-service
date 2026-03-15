@@ -1,6 +1,5 @@
 package br.com.fiap.restaurant.payment.infra.messaging.inbound.consumer;
 
-
 import br.com.fiap.restaurant.payment.core.usecase.ProcessPaymentUseCase;
 import br.com.fiap.restaurant.payment.infra.messaging.inbound.dto.OrderCreatedMessage;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
@@ -15,7 +14,7 @@ public class OrderCreatedConsumer {
         this.processPaymentUseCase = processPaymentUseCase;
     }
 
-    @RabbitListener(queues = "${app.rabbit.order-created-queue}")
+    @RabbitListener(queues = "${app.rabbit.queue.payment-order-created}")
     public void onOrderCreated(OrderCreatedMessage message) {
         processPaymentUseCase.execute(
                 message.orderId(),

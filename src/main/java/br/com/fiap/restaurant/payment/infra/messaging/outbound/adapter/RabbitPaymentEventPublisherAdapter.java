@@ -6,7 +6,6 @@ import br.com.fiap.restaurant.payment.infra.messaging.config.RabbitProperties;
 import br.com.fiap.restaurant.payment.infra.messaging.outbound.dto.PaymentEventMessage;
 import br.com.fiap.restaurant.payment.infra.messaging.outbound.producer.PaymentEventRabbitProducer;
 import org.springframework.context.annotation.Primary;
-import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
 import java.time.OffsetDateTime;
@@ -29,8 +28,8 @@ public class RabbitPaymentEventPublisherAdapter implements PaymentEventPublisher
     @Override
     public void publishApproved(Payment payment) {
         paymentEventRabbitProducer.send(
-                rabbitProperties.getPaymentExchange(),
-                rabbitProperties.getPaymentApprovedRoutingKey(),
+                rabbitProperties.getExchange().getPayment(),
+                rabbitProperties.getRoutingKey().getPaymentApproved(),
                 toMessage(payment)
         );
     }
@@ -38,8 +37,8 @@ public class RabbitPaymentEventPublisherAdapter implements PaymentEventPublisher
     @Override
     public void publishPending(Payment payment) {
         paymentEventRabbitProducer.send(
-                rabbitProperties.getPaymentExchange(),
-                rabbitProperties.getPaymentPendingRoutingKey(),
+                rabbitProperties.getExchange().getPayment(),
+                rabbitProperties.getRoutingKey().getPaymentPending(),
                 toMessage(payment)
         );
     }
