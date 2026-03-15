@@ -2,6 +2,8 @@ package br.com.fiap.restaurant.payment.infra.client.adapter;
 
 import br.com.fiap.restaurant.payment.core.gateway.ExternalPaymentProcessorGateway;
 import br.com.fiap.restaurant.payment.infra.client.processor.ExternalPaymentProcessorClient;
+import io.github.resilience4j.bulkhead.Bulkhead;
+import io.github.resilience4j.bulkhead.BulkheadRegistry;
 import io.github.resilience4j.circuitbreaker.CircuitBreaker;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 import io.github.resilience4j.retry.Retry;
@@ -25,19 +27,22 @@ public class ResilientExternalPaymentProcessorGateway implements ExternalPayment
     private final Retry retry;
     private final CircuitBreaker circuitBreaker;
     private final TimeLimiter timeLimiter;
+    private final Bulkhead bulkhead;
 
     public ResilientExternalPaymentProcessorGateway(
             ExternalPaymentProcessorClient client,
             ExecutorService externalPaymentExecutorService,
             RetryRegistry retryRegistry,
             CircuitBreakerRegistry circuitBreakerRegistry,
-            TimeLimiterRegistry timeLimiterRegistry
+            TimeLimiterRegistry timeLimiterRegistry,
+            BulkheadRegistry bulkheadRegistry
     ) {
         this.client = client;
         this.executorService = externalPaymentExecutorService;
         this.retry = retryRegistry.retry("externalPaymentProcessor");
         this.circuitBreaker = circuitBreakerRegistry.circuitBreaker("externalPaymentProcessor");
         this.timeLimiter = timeLimiterRegistry.timeLimiter("externalPaymentProcessor");
+        this.bulkhead = bulkheadRegistry.bulkhead("externalPaymentProcessor");
     }
 
     @Override
@@ -45,8 +50,11 @@ public class ResilientExternalPaymentProcessorGateway implements ExternalPayment
         try {
             Callable<Boolean> callable = () -> client.process(paymentId, clientId, amount);
 
+            Callable<Boolean> bulkheadCallable =
+                    Bulkhead.decorateCallable(bulkhead, callable);
+
             Callable<Boolean> circuitBreakerCallable =
-                    CircuitBreaker.decorateCallable(circuitBreaker, callable);
+                    CircuitBreaker.decorateCallable(circuitBreaker, bulkheadCallable);
 
             Callable<Boolean> retryCallable =
                     Retry.decorateCallable(retry, circuitBreakerCallable);

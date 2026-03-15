@@ -1,6 +1,7 @@
 package br.com.fiap.restaurant.payment.infra.client.adapter;
 
 import br.com.fiap.restaurant.payment.infra.client.processor.ExternalPaymentProcessorClient;
+import io.github.resilience4j.bulkhead.BulkheadRegistry;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 import io.github.resilience4j.retry.RetryRegistry;
 import io.github.resilience4j.timelimiter.TimeLimiterRegistry;
@@ -26,6 +27,7 @@ class ResilientExternalPaymentProcessorGatewayTest {
     private RetryRegistry retryRegistry;
     private CircuitBreakerRegistry circuitBreakerRegistry;
     private TimeLimiterRegistry timeLimiterRegistry;
+    private BulkheadRegistry bulkheadRegistry;
     private ResilientExternalPaymentProcessorGateway gateway;
 
     @BeforeEach
@@ -36,9 +38,12 @@ class ResilientExternalPaymentProcessorGatewayTest {
         retryRegistry = RetryRegistry.ofDefaults();
         circuitBreakerRegistry = CircuitBreakerRegistry.ofDefaults();
         timeLimiterRegistry = TimeLimiterRegistry.ofDefaults();
+        bulkheadRegistry = BulkheadRegistry.ofDefaults();
 
         retryRegistry.retry("externalPaymentProcessor");
         circuitBreakerRegistry.circuitBreaker("externalPaymentProcessor");
+        bulkheadRegistry.bulkhead("externalPaymentProcessor");
+
         timeLimiterRegistry.timeLimiter(
                 "externalPaymentProcessor",
                 io.github.resilience4j.timelimiter.TimeLimiterConfig.custom()
@@ -51,7 +56,8 @@ class ResilientExternalPaymentProcessorGatewayTest {
                 executorService,
                 retryRegistry,
                 circuitBreakerRegistry,
-                timeLimiterRegistry
+                timeLimiterRegistry,
+                bulkheadRegistry
         );
     }
 
