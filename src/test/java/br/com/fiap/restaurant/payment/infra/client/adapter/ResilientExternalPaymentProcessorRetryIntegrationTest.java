@@ -4,6 +4,7 @@ import br.com.fiap.restaurant.payment.infra.client.processor.ExternalPaymentProc
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import java.math.BigDecimal;
@@ -19,6 +20,7 @@ import static org.mockito.Mockito.when;
         "spring.rabbitmq.listener.simple.auto-startup=false",
         "app.payment.retry.scheduler.enabled=false"
 })
+@ActiveProfiles("test")
 class ResilientExternalPaymentProcessorRetryIntegrationTest {
 
     @Autowired

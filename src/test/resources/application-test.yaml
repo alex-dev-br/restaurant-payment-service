@@ -1,0 +1,3 @@
+app:
+    external-payment:
+        fake-enabled: true

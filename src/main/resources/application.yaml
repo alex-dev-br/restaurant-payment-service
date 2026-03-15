@@ -44,6 +44,12 @@ resilience4j:
       externalPaymentProcessor:
         timeout-duration: 2s
 
+  bulkhead:
+    instances:
+      externalPaymentProcessor:
+        max-concurrent-calls: 5
+        max-wait-duration: 0
+
 app:
   rabbit:
     order-exchange: ${APP_RABBIT_ORDER_EXCHANGE:order.exchange}
@@ -63,6 +69,13 @@ app:
       scheduler:
         enabled: true
         fixed-delay-ms: 30000
+
+  external-payment:
+    fake-enabled: ${APP_EXTERNAL_PAYMENT_FAKE_ENABLED:false}
+    base-url: ${APP_EXTERNAL_PAYMENT_BASE_URL:http://localhost:8089}
+    request-path: ${APP_EXTERNAL_PAYMENT_REQUEST_PATH:/requisicao}
+    connect-timeout-ms: ${APP_EXTERNAL_PAYMENT_CONNECT_TIMEOUT_MS:1000}
+    read-timeout-ms: ${APP_EXTERNAL_PAYMENT_READ_TIMEOUT_MS:2000}
 
 server:
   port: ${SERVER_PORT:8083}

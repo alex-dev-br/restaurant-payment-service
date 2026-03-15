@@ -4,6 +4,7 @@ import br.com.fiap.restaurant.payment.infra.client.processor.ExternalPaymentProc
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import java.math.BigDecimal;
@@ -18,6 +19,7 @@ import static org.mockito.Mockito.when;
         "app.payment.retry.scheduler.enabled=false",
         "resilience4j.timelimiter.instances.externalPaymentProcessor.timeout-duration=1s"
 })
+@ActiveProfiles("test")
 class ResilientExternalPaymentProcessorExecutorIntegrationTest {
 
     @Autowired
