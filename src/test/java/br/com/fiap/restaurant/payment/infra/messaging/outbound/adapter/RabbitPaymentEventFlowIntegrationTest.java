@@ -16,7 +16,10 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import java.math.BigDecimal;
 import java.util.UUID;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.when;
@@ -45,8 +48,8 @@ class RabbitPaymentEventFlowIntegrationTest {
 
     @BeforeEach
     void setUp() {
-        purgeQueue(rabbitProperties.getApprovedDebugQueue());
-        purgeQueue(rabbitProperties.getPendingDebugQueue());
+        purgeQueue(rabbitProperties.getQueue().getPaymentApprovedDebug());
+        purgeQueue(rabbitProperties.getQueue().getPaymentPendingDebug());
     }
 
     @Test
@@ -64,7 +67,10 @@ class RabbitPaymentEventFlowIntegrationTest {
         processPaymentUseCase.execute(orderId, clientId, amount);
 
         PaymentEventMessage approvedMessage =
-                receiveExpectedMessage(rabbitProperties.getApprovedDebugQueue(), PaymentEventMessage.class);
+                receiveExpectedMessage(
+                        rabbitProperties.getQueue().getPaymentApprovedDebug(),
+                        PaymentEventMessage.class
+                );
 
         assertNotNull(approvedMessage.paymentId());
         assertEquals(orderId, approvedMessage.orderId());
@@ -74,7 +80,10 @@ class RabbitPaymentEventFlowIntegrationTest {
         assertNotNull(approvedMessage.occurredAt());
 
         PaymentEventMessage pendingMessage =
-                receiveUnexpectedMessage(rabbitProperties.getPendingDebugQueue(), PaymentEventMessage.class);
+                receiveUnexpectedMessage(
+                        rabbitProperties.getQueue().getPaymentPendingDebug(),
+                        PaymentEventMessage.class
+                );
 
         assertNull(pendingMessage);
     }
@@ -94,7 +103,10 @@ class RabbitPaymentEventFlowIntegrationTest {
         processPaymentUseCase.execute(orderId, clientId, amount);
 
         PaymentEventMessage pendingMessage =
-                receiveExpectedMessage(rabbitProperties.getPendingDebugQueue(), PaymentEventMessage.class);
+                receiveExpectedMessage(
+                        rabbitProperties.getQueue().getPaymentPendingDebug(),
+                        PaymentEventMessage.class
+                );
 
         assertNotNull(pendingMessage.paymentId());
         assertEquals(orderId, pendingMessage.orderId());
@@ -104,7 +116,10 @@ class RabbitPaymentEventFlowIntegrationTest {
         assertNotNull(pendingMessage.occurredAt());
 
         PaymentEventMessage approvedMessage =
-                receiveUnexpectedMessage(rabbitProperties.getApprovedDebugQueue(), PaymentEventMessage.class);
+                receiveUnexpectedMessage(
+                        rabbitProperties.getQueue().getPaymentApprovedDebug(),
+                        PaymentEventMessage.class
+                );
 
         assertNull(approvedMessage);
     }
@@ -126,7 +141,10 @@ class RabbitPaymentEventFlowIntegrationTest {
         processPaymentUseCase.execute(orderId, clientId, amount);
 
         PaymentEventMessage pendingMessage =
-                receiveExpectedMessage(rabbitProperties.getPendingDebugQueue(), PaymentEventMessage.class);
+                receiveExpectedMessage(
+                        rabbitProperties.getQueue().getPaymentPendingDebug(),
+                        PaymentEventMessage.class
+                );
 
         assertNotNull(pendingMessage.paymentId());
         assertEquals(orderId, pendingMessage.orderId());
@@ -136,7 +154,10 @@ class RabbitPaymentEventFlowIntegrationTest {
         assertNotNull(pendingMessage.occurredAt());
 
         PaymentEventMessage approvedMessage =
-                receiveUnexpectedMessage(rabbitProperties.getApprovedDebugQueue(), PaymentEventMessage.class);
+                receiveUnexpectedMessage(
+                        rabbitProperties.getQueue().getPaymentApprovedDebug(),
+                        PaymentEventMessage.class
+                );
 
         assertNull(approvedMessage);
     }
