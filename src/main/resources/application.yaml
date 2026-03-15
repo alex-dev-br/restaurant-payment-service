@@ -52,17 +52,25 @@ resilience4j:
 
 app:
   rabbit:
-    order-exchange: ${APP_RABBIT_ORDER_EXCHANGE:order.exchange}
-    payment-exchange: ${APP_RABBIT_PAYMENT_EXCHANGE:payment.exchange}
+    exchange:
+      order: ${APP_RABBIT_EXCHANGE_ORDER:ex.order}
+      payment: ${APP_RABBIT_EXCHANGE_PAYMENT:ex.payment}
 
-    order-created-queue: ${APP_RABBIT_ORDER_CREATED_QUEUE:pedido.criado.queue}
-    order-created-routing-key: ${APP_RABBIT_ORDER_CREATED_ROUTING_KEY:pedido.criado}
+    routing-key:
+      order-created: ${APP_RABBIT_ROUTING_KEY_ORDER_CREATED:order.created}
+      payment-approved: ${APP_RABBIT_ROUTING_KEY_PAYMENT_APPROVED:payment.approved}
+      payment-pending: ${APP_RABBIT_ROUTING_KEY_PAYMENT_PENDING:payment.pending}
 
-    payment-approved-routing-key: ${APP_RABBIT_PAYMENT_APPROVED_ROUTING_KEY:pagamento.aprovado}
-    payment-pending-routing-key: ${APP_RABBIT_PAYMENT_PENDING_ROUTING_KEY:pagamento.pendente}
+    queue:
+      payment-order-created: ${APP_RABBIT_QUEUE_PAYMENT_ORDER_CREATED:payment.order.created}
+      payment-approved-debug: ${APP_RABBIT_QUEUE_PAYMENT_APPROVED_DEBUG:payment.approved.debug}
+      payment-pending-debug: ${APP_RABBIT_QUEUE_PAYMENT_PENDING_DEBUG:payment.pending.debug}
 
-    approved-debug-queue: ${APP_RABBIT_APPROVED_DEBUG_QUEUE:payment.approved.debug.queue}
-    pending-debug-queue: ${APP_RABBIT_PENDING_DEBUG_QUEUE:payment.pending.debug.queue}
+    dlq:
+      payment-order-created: ${APP_RABBIT_DLQ_PAYMENT_ORDER_CREATED:payment.order.created.dlq}
+      payment-approved-debug: ${APP_RABBIT_DLQ_PAYMENT_APPROVED_DEBUG:payment.approved.debug.dlq}
+      payment-pending-debug: ${APP_RABBIT_DLQ_PAYMENT_PENDING_DEBUG:payment.pending.debug.dlq}
+
 
   payment:
     retry:
