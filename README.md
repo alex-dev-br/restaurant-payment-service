@@ -1,4 +1,3 @@
-
 # 📦 Payment Service – FIAP Restaurant
 
 Microsserviço responsável pelo **processamento de pagamentos** no ecossistema **Restaurant FIAP**.
@@ -48,6 +47,10 @@ O sistema utiliza **mensageria assíncrona** para comunicação entre microsserv
 flowchart LR
 
 OrderService -->|pedido.criado| PaymentService
+
+PaymentService -->|HTTP| ExternalProcessor
+PaymentService -->|persistência| PostgreSQL
+
 PaymentService -->|pagamento.aprovado| RabbitMQ
 PaymentService -->|pagamento.pendente| RabbitMQ
 
@@ -88,6 +91,57 @@ else novo pagamento
         PaymentService->>RabbitMQ: pagamento.pendente
     end
 end
+```
+
+---
+
+# 🌐 Integração com Processador de Pagamentos
+
+O serviço integra com um **processador externo de pagamentos** disponibilizado no ambiente local (`procpag`).
+
+Endpoints utilizados:
+
+| Método | Endpoint                     |
+| ------ | ---------------------------- |
+| POST   | `/requisicao`                |
+| GET    | `/requisicao/{pagamento_id}` |
+
+Fluxo de integração:
+
+1. O `payment-service` envia uma requisição de pagamento
+2. O processador retorna `accepted`
+3. O serviço consulta o status do pagamento
+4. Quando o status retorna `pago`, o pagamento é marcado como `APPROVED`
+
+Observações identificadas durante os testes reais:
+
+* o campo `valor` deve ser enviado como **inteiro positivo**
+* o processador pode apresentar **falhas intermitentes**
+* falhas resultam em pagamentos **PENDING**
+
+---
+
+# 🔁 Retry de Pagamentos Pendentes
+
+Pagamentos que permanecem com status `PENDING` são automaticamente **reprocessados por um scheduler**.
+
+Fluxo:
+
+1️⃣ pagamento falha no processador externo
+2️⃣ status permanece `PENDING`
+3️⃣ scheduler executa periodicamente
+4️⃣ pagamento é reenviado ao processador
+5️⃣ quando aprovado, status é atualizado para `APPROVED`
+
+Configuração:
+
+```yaml
+app:
+  payment:
+    retry:
+      scheduler:
+        enabled: true
+        fixed-delay-ms: 30000
 ```
 
 ---
@@ -164,6 +218,8 @@ Fluxo de pagamento:
 * mantém pagamento `PENDING`
 * publica evento `pagamento.pendente`
 
+6️⃣ pagamentos pendentes serão **reprocessados automaticamente pelo scheduler**
+
 ---
 
 # 📊 Observabilidade
@@ -209,6 +265,20 @@ idx_payments_client_id
 O schema é versionado com **Flyway**.
 
 Hibernate está configurado apenas para **validação**.
+
+---
+
+# 🧪 Cenários Validados
+
+Durante os testes integrados do serviço foram validados os seguintes cenários:
+
+* consumo do evento `pedido.criado`
+* persistência do pagamento no PostgreSQL
+* integração HTTP real com o processador externo
+* publicação do evento `pagamento.aprovado`
+* tratamento de falhas com status `PENDING`
+* reprocessamento automático de pagamentos pendentes
+* idempotência por `orderId`
 
 ---
 
@@ -358,13 +428,9 @@ Pagamentos são **idempotentes por orderId**, evitando:
 
 ---
 
-# 🎓 Contexto Acadêmico
 
-Projeto desenvolvido como parte do curso:
 
-**FIAP — Pós-Graduação em Arquitetura e Desenvolvimento Java**
 
-Tech Challenge – Arquitetura de Microsserviços.
 
 
 
