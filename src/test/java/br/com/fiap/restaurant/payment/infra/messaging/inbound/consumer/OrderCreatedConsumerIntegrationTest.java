@@ -1,6 +1,7 @@
 package br.com.fiap.restaurant.payment.infra.messaging.inbound.consumer;
 
 import br.com.fiap.restaurant.payment.core.usecase.ProcessPaymentUseCase;
+import br.com.fiap.restaurant.payment.core.usecase.command.ProcessPaymentCommand;
 import br.com.fiap.restaurant.payment.infra.messaging.config.RabbitProperties;
 import br.com.fiap.restaurant.payment.infra.messaging.inbound.dto.OrderCreatedMessage;
 import org.junit.jupiter.api.BeforeEach;
@@ -64,19 +65,16 @@ class OrderCreatedConsumerIntegrationTest {
                 message
         );
 
-        ArgumentCaptor<Long> orderIdCaptor = ArgumentCaptor.forClass(Long.class);
-        ArgumentCaptor<UUID> clientIdCaptor = ArgumentCaptor.forClass(UUID.class);
-        ArgumentCaptor<BigDecimal> amountCaptor = ArgumentCaptor.forClass(BigDecimal.class);
+        ArgumentCaptor<ProcessPaymentCommand> commandCaptor =
+                ArgumentCaptor.forClass(ProcessPaymentCommand.class);
 
-        verify(processPaymentUseCase, timeout(5000)).execute(
-                orderIdCaptor.capture(),
-                clientIdCaptor.capture(),
-                amountCaptor.capture()
-        );
+        verify(processPaymentUseCase, timeout(5000)).execute(commandCaptor.capture());
 
-        assertEquals(orderId, orderIdCaptor.getValue());
-        assertEquals(clientId, clientIdCaptor.getValue());
-        assertEquals(amount, amountCaptor.getValue());
+        ProcessPaymentCommand capturedCommand = commandCaptor.getValue();
+
+        assertEquals(orderId, capturedCommand.orderId());
+        assertEquals(clientId, capturedCommand.clientId());
+        assertEquals(amount, capturedCommand.amount());
     }
 
     private void purgeQueue(String queueName) {

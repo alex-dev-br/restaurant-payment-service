@@ -6,6 +6,7 @@ import br.com.fiap.restaurant.payment.core.gateway.PaymentObservabilityGateway;
 import br.com.fiap.restaurant.payment.core.gateway.PaymentRepositoryGateway;
 import br.com.fiap.restaurant.payment.core.domain.model.Payment;
 import br.com.fiap.restaurant.payment.core.domain.model.PaymentStatus;
+import br.com.fiap.restaurant.payment.core.usecase.command.ProcessPaymentCommand;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -52,7 +53,7 @@ class ProcessPaymentUseCaseTest {
     void shouldProcessAndApprovePaymentSuccessfully() {
         Long orderId = 1L;
         UUID clientId = UUID.randomUUID();
-        BigDecimal amount = new BigDecimal("100.00");
+        BigDecimal amount = new BigDecimal("89.90");
 
         when(paymentRepositoryGateway.findByOrderId(orderId)).thenReturn(Optional.empty());
         when(paymentRepositoryGateway.save(any(Payment.class)))
@@ -60,7 +61,8 @@ class ProcessPaymentUseCaseTest {
         when(externalPaymentProcessorGateway.process(any(UUID.class), eq(clientId), eq(amount)))
                 .thenReturn(true);
 
-        Payment result = processPaymentUseCase.execute(orderId, clientId, amount);
+        ProcessPaymentCommand command = new ProcessPaymentCommand(orderId, clientId, amount);
+        Payment result = processPaymentUseCase.execute(command);
 
         assertNotNull(result);
         assertEquals(orderId, result.getOrderId());
@@ -103,7 +105,8 @@ class ProcessPaymentUseCaseTest {
         when(externalPaymentProcessorGateway.process(any(UUID.class), eq(clientId), eq(amount)))
                 .thenReturn(false);
 
-        Payment result = processPaymentUseCase.execute(orderId, clientId, amount);
+        ProcessPaymentCommand command = new ProcessPaymentCommand(orderId, clientId, amount);
+        Payment result = processPaymentUseCase.execute(command);
 
         assertNotNull(result);
         assertEquals(orderId, result.getOrderId());
@@ -146,7 +149,8 @@ class ProcessPaymentUseCaseTest {
         when(externalPaymentProcessorGateway.process(any(UUID.class), eq(clientId), eq(amount)))
                 .thenThrow(new RuntimeException("Serviço indisponível"));
 
-        Payment result = processPaymentUseCase.execute(orderId, clientId, amount);
+        ProcessPaymentCommand command = new ProcessPaymentCommand(orderId, clientId, amount);
+        Payment result = processPaymentUseCase.execute(command);
 
         assertNotNull(result);
         assertEquals(orderId, result.getOrderId());
@@ -186,7 +190,8 @@ class ProcessPaymentUseCaseTest {
 
         when(paymentRepositoryGateway.findByOrderId(orderId)).thenReturn(Optional.of(existingPayment));
 
-        Payment result = processPaymentUseCase.execute(orderId, clientId, amount);
+        ProcessPaymentCommand command = new ProcessPaymentCommand(orderId, clientId, amount);
+        Payment result = processPaymentUseCase.execute(command);
 
         assertEquals(existingPayment, result);
 
@@ -225,7 +230,8 @@ class ProcessPaymentUseCaseTest {
         when(paymentRepositoryGateway.findByOrderId(orderId)).thenReturn(Optional.empty());
         when(paymentRepositoryGateway.save(any(Payment.class))).thenReturn(claimedByAnotherFlow);
 
-        Payment result = processPaymentUseCase.execute(orderId, clientId, amount);
+        ProcessPaymentCommand command = new ProcessPaymentCommand(orderId, clientId, amount);
+        Payment result = processPaymentUseCase.execute(command);
 
         assertNotNull(result);
         assertEquals(claimedByAnotherFlow.getId(), result.getId());

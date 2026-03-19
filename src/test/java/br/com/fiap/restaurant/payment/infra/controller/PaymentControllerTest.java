@@ -4,6 +4,7 @@ import br.com.fiap.restaurant.payment.core.domain.model.Payment;
 import br.com.fiap.restaurant.payment.core.domain.model.PaymentStatus;
 import br.com.fiap.restaurant.payment.core.usecase.FindPaymentByOrderIdUseCase;
 import br.com.fiap.restaurant.payment.core.usecase.ProcessPaymentUseCase;
+import br.com.fiap.restaurant.payment.core.usecase.command.ProcessPaymentCommand;
 import br.com.fiap.restaurant.payment.infra.controller.mapper.PaymentControllerMapper;
 import br.com.fiap.restaurant.payment.infra.controller.response.PaymentResponse;
 import org.junit.jupiter.api.Test;
@@ -70,7 +71,8 @@ class PaymentControllerTest {
                 updatedAt
         );
 
-        when(processPaymentUseCase.execute(orderId, clientId, amount)).thenReturn(payment);
+        ProcessPaymentCommand command = new ProcessPaymentCommand(orderId, clientId, amount);
+        when(processPaymentUseCase.execute(command)).thenReturn(payment);
         when(paymentControllerMapper.toResponse(payment)).thenReturn(response);
 
         mockMvc.perform(post("/payments/process")

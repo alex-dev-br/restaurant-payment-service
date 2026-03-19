@@ -2,6 +2,7 @@ package br.com.fiap.restaurant.payment.infra.messaging.outbound.adapter;
 
 import br.com.fiap.restaurant.payment.core.gateway.ExternalPaymentProcessorGateway;
 import br.com.fiap.restaurant.payment.core.usecase.ProcessPaymentUseCase;
+import br.com.fiap.restaurant.payment.core.usecase.command.ProcessPaymentCommand;
 import br.com.fiap.restaurant.payment.infra.messaging.config.RabbitProperties;
 import br.com.fiap.restaurant.payment.infra.messaging.outbound.dto.PaymentEventMessage;
 import br.com.fiap.restaurant.payment.infra.persistence.repository.SpringDataPaymentRepository;
@@ -69,7 +70,8 @@ class RabbitPaymentEventFlowIntegrationTest {
                 any(BigDecimal.class)
         )).thenReturn(true);
 
-        processPaymentUseCase.execute(orderId, clientId, amount);
+        ProcessPaymentCommand command = new ProcessPaymentCommand(orderId, clientId, amount);
+        processPaymentUseCase.execute(command);
 
         PaymentEventMessage approvedMessage = receiveExpectedMessage(
                 rabbitProperties.getQueue().getPaymentApprovedDebug(),
@@ -98,7 +100,8 @@ class RabbitPaymentEventFlowIntegrationTest {
                 any(BigDecimal.class)
         )).thenReturn(false);
 
-        processPaymentUseCase.execute(orderId, clientId, amount);
+        ProcessPaymentCommand command = new ProcessPaymentCommand(orderId, clientId, amount);
+        processPaymentUseCase.execute(command);
 
         PaymentEventMessage pendingMessage = receiveExpectedMessage(
                 rabbitProperties.getQueue().getPaymentPendingDebug(),
@@ -129,7 +132,8 @@ class RabbitPaymentEventFlowIntegrationTest {
                         any(BigDecimal.class)
                 );
 
-        processPaymentUseCase.execute(orderId, clientId, amount);
+        ProcessPaymentCommand command = new ProcessPaymentCommand(orderId, clientId, amount);
+        processPaymentUseCase.execute(command);
 
         PaymentEventMessage pendingMessage = receiveExpectedMessage(
                 rabbitProperties.getQueue().getPaymentPendingDebug(),

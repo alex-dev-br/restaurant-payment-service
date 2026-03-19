@@ -4,6 +4,7 @@ import br.com.fiap.restaurant.payment.core.domain.model.Payment;
 import br.com.fiap.restaurant.payment.core.domain.model.PaymentStatus;
 import br.com.fiap.restaurant.payment.core.gateway.ExternalPaymentProcessorGateway;
 import br.com.fiap.restaurant.payment.core.gateway.PaymentEventPublisherGateway;
+import br.com.fiap.restaurant.payment.core.usecase.command.ProcessPaymentCommand;
 import br.com.fiap.restaurant.payment.infra.persistence.adapter.PaymentPersistenceMapper;
 import br.com.fiap.restaurant.payment.infra.persistence.adapter.PaymentRepositoryAdapter;
 import br.com.fiap.restaurant.payment.infra.persistence.repository.SpringDataPaymentRepository;
@@ -63,7 +64,8 @@ class ProcessPaymentUseCaseIntegrationTest {
         when(externalPaymentProcessorGateway.process(any(UUID.class), eq(clientId), eq(amount)))
                 .thenReturn(true);
 
-        Payment result = processPaymentUseCase.execute(orderId, clientId, amount);
+        ProcessPaymentCommand command = new ProcessPaymentCommand(orderId, clientId, amount);
+        Payment result = processPaymentUseCase.execute(command);
 
         assertNotNull(result);
         assertEquals(PaymentStatus.APPROVED, result.getStatus());
@@ -93,7 +95,8 @@ class ProcessPaymentUseCaseIntegrationTest {
         when(externalPaymentProcessorGateway.process(any(UUID.class), eq(clientId), eq(amount)))
                 .thenReturn(false);
 
-        Payment result = processPaymentUseCase.execute(orderId, clientId, amount);
+        ProcessPaymentCommand command = new ProcessPaymentCommand(orderId, clientId, amount);
+        Payment result = processPaymentUseCase.execute(command);
 
         assertNotNull(result);
         assertEquals(PaymentStatus.PENDING, result.getStatus());
@@ -123,7 +126,8 @@ class ProcessPaymentUseCaseIntegrationTest {
         when(externalPaymentProcessorGateway.process(any(UUID.class), eq(clientId), eq(amount)))
                 .thenThrow(new RuntimeException("Serviço indisponível"));
 
-        Payment result = processPaymentUseCase.execute(orderId, clientId, amount);
+        ProcessPaymentCommand command = new ProcessPaymentCommand(orderId, clientId, amount);
+        Payment result = processPaymentUseCase.execute(command);
 
         assertNotNull(result);
         assertEquals(PaymentStatus.PENDING, result.getStatus());
@@ -153,8 +157,9 @@ class ProcessPaymentUseCaseIntegrationTest {
         when(externalPaymentProcessorGateway.process(any(UUID.class), eq(clientId), eq(amount)))
                 .thenReturn(true);
 
-        Payment firstResult = processPaymentUseCase.execute(orderId, clientId, amount);
-        Payment secondResult = processPaymentUseCase.execute(orderId, clientId, amount);
+        ProcessPaymentCommand command = new ProcessPaymentCommand(orderId, clientId, amount);
+        Payment firstResult = processPaymentUseCase.execute(command);
+        Payment secondResult = processPaymentUseCase.execute(command);
 
         assertNotNull(firstResult);
         assertNotNull(secondResult);

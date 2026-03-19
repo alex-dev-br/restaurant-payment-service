@@ -1,13 +1,11 @@
 package br.com.fiap.restaurant.payment.core.usecase;
 
+import br.com.fiap.restaurant.payment.core.domain.model.Payment;
+import br.com.fiap.restaurant.payment.core.usecase.command.ProcessPaymentCommand;
 import br.com.fiap.restaurant.payment.core.gateway.ExternalPaymentProcessorGateway;
 import br.com.fiap.restaurant.payment.core.gateway.PaymentEventPublisherGateway;
 import br.com.fiap.restaurant.payment.core.gateway.PaymentObservabilityGateway;
 import br.com.fiap.restaurant.payment.core.gateway.PaymentRepositoryGateway;
-import br.com.fiap.restaurant.payment.core.domain.model.Payment;
-
-import java.math.BigDecimal;
-import java.util.UUID;
 
 public class ProcessPaymentUseCase {
 
@@ -28,13 +26,17 @@ public class ProcessPaymentUseCase {
         this.paymentObservabilityGateway = paymentObservabilityGateway;
     }
 
-    public Payment execute(Long orderId, UUID clientId, BigDecimal amount) {
+    public Payment execute(ProcessPaymentCommand command) {
         return paymentObservabilityGateway.measureProcessing(() -> {
-            paymentObservabilityGateway.logProcessingStarted(orderId, clientId, amount);
+            paymentObservabilityGateway.logProcessingStarted(
+                    command.orderId(),
+                    command.clientId(),
+                    command.amount()
+            );
 
-            return paymentRepositoryGateway.findByOrderId(orderId)
+            return paymentRepositoryGateway.findByOrderId(command.orderId())
                     .map(this::reuseExistingPayment)
-                    .orElseGet(() -> claimAndProcessPayment(orderId, clientId, amount));
+                    .orElseGet(() -> claimAndProcessPayment(command));
         });
     }
 
@@ -43,8 +45,13 @@ public class ProcessPaymentUseCase {
         return existingPayment;
     }
 
-    private Payment claimAndProcessPayment(Long orderId, UUID clientId, BigDecimal amount) {
-        Payment newPayment = Payment.createPending(orderId, clientId, amount);
+    private Payment claimAndProcessPayment(ProcessPaymentCommand command) {
+        Payment newPayment = Payment.createPending(
+                command.orderId(),
+                command.clientId(),
+                command.amount()
+        );
+
         Payment claimedPayment = paymentRepositoryGateway.save(newPayment);
 
         if (isConcurrentClaimReuse(newPayment, claimedPayment)) {
@@ -70,44 +77,31 @@ public class ProcessPaymentUseCase {
             );
 
             if (approved) {
-                return approvePayment(payment);
+                payment.approve();
+                return persistAndPublishApproved(payment);
             }
 
-            return keepPaymentPending(payment);
+            payment.markAsPending();
+            return persistAndPublishPending(payment);
 
         } catch (Exception exception) {
-            return handleProcessingError(payment, exception);
+            payment.markAsPending();
+            paymentObservabilityGateway.logExternalError(payment, exception);
+            return persistAndPublishPending(payment);
         }
     }
 
-    private Payment approvePayment(Payment payment) {
-        payment.approve();
-
+    private Payment persistAndPublishApproved(Payment payment) {
         Payment savedPayment = paymentRepositoryGateway.save(payment);
         paymentEventPublisherGateway.publishApproved(savedPayment);
         paymentObservabilityGateway.logApproved(savedPayment);
-
         return savedPayment;
     }
 
-    private Payment keepPaymentPending(Payment payment) {
-        payment.markAsPending();
-
+    private Payment persistAndPublishPending(Payment payment) {
         Payment savedPayment = paymentRepositoryGateway.save(payment);
         paymentEventPublisherGateway.publishPending(savedPayment);
         paymentObservabilityGateway.logPending(savedPayment);
-
-        return savedPayment;
-    }
-
-    private Payment handleProcessingError(Payment payment, Exception exception) {
-        payment.markAsPending();
-
-        Payment savedPayment = paymentRepositoryGateway.save(payment);
-        paymentEventPublisherGateway.publishPending(savedPayment);
-        paymentObservabilityGateway.logExternalError(savedPayment, exception);
-        paymentObservabilityGateway.logPending(savedPayment);
-
         return savedPayment;
     }
 }
