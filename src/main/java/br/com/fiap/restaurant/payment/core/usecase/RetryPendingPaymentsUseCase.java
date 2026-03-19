@@ -41,7 +41,7 @@ public class RetryPendingPaymentsUseCase {
             paymentObservabilityGateway.logExternalProcessingStarted(payment);
 
             boolean approved = externalPaymentProcessorGateway.process(
-                    payment.getOrderId(),
+                    payment.getId(),
                     payment.getClientId(),
                     payment.getAmount()
             );

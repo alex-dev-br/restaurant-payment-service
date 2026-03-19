@@ -10,7 +10,7 @@ import java.util.function.Supplier;
 public class NoOpPaymentObservabilityAdapter implements PaymentObservabilityGateway {
 
     @Override
-    public void logProcessingStarted(UUID orderId, UUID clientId, BigDecimal amount) {}
+    public void logProcessingStarted(Long orderId, UUID clientId, BigDecimal amount) {}
 
     @Override
     public void logIdempotentReuse(Payment payment) {}

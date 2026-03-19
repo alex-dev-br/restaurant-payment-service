@@ -56,7 +56,7 @@ class ProcessPaymentUseCaseIntegrationTest {
 
     @Test
     void shouldPersistApprovedPaymentWhenExternalProcessorApproves() {
-        UUID orderId = UUID.randomUUID();
+        Long orderId = 1L;
         UUID clientId = UUID.randomUUID();
         BigDecimal amount = new BigDecimal("120.00");
 
@@ -86,7 +86,7 @@ class ProcessPaymentUseCaseIntegrationTest {
 
     @Test
     void shouldPersistPendingPaymentWhenExternalProcessorReturnsFalse() {
-        UUID orderId = UUID.randomUUID();
+        Long orderId = 2L;
         UUID clientId = UUID.randomUUID();
         BigDecimal amount = new BigDecimal("55.90");
 
@@ -116,7 +116,7 @@ class ProcessPaymentUseCaseIntegrationTest {
 
     @Test
     void shouldPersistPendingPaymentWhenExternalProcessorThrowsException() {
-        UUID orderId = UUID.randomUUID();
+        Long orderId = 3L;
         UUID clientId = UUID.randomUUID();
         BigDecimal amount = new BigDecimal("77.50");
 
@@ -146,7 +146,7 @@ class ProcessPaymentUseCaseIntegrationTest {
 
     @Test
     void shouldReturnExistingPaymentWhenPaymentAlreadyExistsForOrder() {
-        UUID orderId = UUID.randomUUID();
+        Long orderId = 4L;
         UUID clientId = UUID.randomUUID();
         BigDecimal amount = new BigDecimal("120.00");
 

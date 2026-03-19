@@ -44,7 +44,7 @@ class PaymentControllerTest {
     @Test
     void shouldProcessPaymentAndReturnCreated() throws Exception {
         UUID paymentId = UUID.randomUUID();
-        UUID orderId = UUID.fromString("11111111-1111-1111-1111-111111111111");
+        Long orderId = 1L;
         UUID clientId = UUID.fromString("22222222-2222-2222-2222-222222222222");
         BigDecimal amount = new BigDecimal("120.00");
         OffsetDateTime createdAt = OffsetDateTime.now();
@@ -77,14 +77,14 @@ class PaymentControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
-                                  "orderId": "11111111-1111-1111-1111-111111111111",
+                                  "orderId": 1,
                                   "clientId": "22222222-2222-2222-2222-222222222222",
                                   "amount": 120.00
                                 }
                                 """))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.paymentId").value(paymentId.toString()))
-                .andExpect(jsonPath("$.orderId").value(orderId.toString()))
+                .andExpect(jsonPath("$.orderId").value(orderId))
                 .andExpect(jsonPath("$.clientId").value(clientId.toString()))
                 .andExpect(jsonPath("$.amount").value(120.00))
                 .andExpect(jsonPath("$.status").value("APPROVED"));
@@ -93,7 +93,7 @@ class PaymentControllerTest {
     @Test
     void shouldFindPaymentByOrderIdAndReturnOk() throws Exception {
         UUID paymentId = UUID.randomUUID();
-        UUID orderId = UUID.fromString("11111111-1111-1111-1111-111111111111");
+        Long orderId = 1L;
         UUID clientId = UUID.fromString("22222222-2222-2222-2222-222222222222");
         BigDecimal amount = new BigDecimal("120.00");
         OffsetDateTime createdAt = OffsetDateTime.now();
@@ -125,7 +125,7 @@ class PaymentControllerTest {
         mockMvc.perform(get("/payments/order/{orderId}", orderId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.paymentId").value(paymentId.toString()))
-                .andExpect(jsonPath("$.orderId").value(orderId.toString()))
+                .andExpect(jsonPath("$.orderId").value(orderId))
                 .andExpect(jsonPath("$.clientId").value(clientId.toString()))
                 .andExpect(jsonPath("$.amount").value(120.00))
                 .andExpect(jsonPath("$.status").value("APPROVED"));
@@ -153,7 +153,7 @@ class PaymentControllerTest {
 
     @Test
     void shouldReturnNotFoundWhenPaymentDoesNotExist() throws Exception {
-        UUID orderId = UUID.fromString("99999999-9999-9999-9999-999999999999");
+        Long orderId = 999L;
 
         when(findPaymentByOrderIdUseCase.execute(orderId))
                 .thenThrow(new IllegalArgumentException(

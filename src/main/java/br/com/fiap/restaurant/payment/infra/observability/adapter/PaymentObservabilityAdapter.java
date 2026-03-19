@@ -42,7 +42,7 @@ public class PaymentObservabilityAdapter implements PaymentObservabilityGateway 
     }
 
     @Override
-    public void logProcessingStarted(UUID orderId, UUID clientId, BigDecimal amount) {
+    public void logProcessingStarted(Long orderId, UUID clientId, BigDecimal amount) {
         log.info("Iniciando processamento do pagamento. orderId={}, clientId={}, amount={}",
                 orderId, clientId, amount);
     }

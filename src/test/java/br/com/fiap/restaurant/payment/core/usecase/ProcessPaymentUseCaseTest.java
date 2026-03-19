@@ -50,7 +50,7 @@ class ProcessPaymentUseCaseTest {
 
     @Test
     void shouldProcessAndApprovePaymentSuccessfully() {
-        UUID orderId = UUID.randomUUID();
+        Long orderId = 1L;
         UUID clientId = UUID.randomUUID();
         BigDecimal amount = new BigDecimal("100.00");
 
@@ -93,7 +93,7 @@ class ProcessPaymentUseCaseTest {
 
     @Test
     void shouldMarkPaymentAsPendingWhenExternalProcessorReturnsFalse() {
-        UUID orderId = UUID.randomUUID();
+        Long orderId = 1L;
         UUID clientId = UUID.randomUUID();
         BigDecimal amount = new BigDecimal("55.90");
 
@@ -136,7 +136,7 @@ class ProcessPaymentUseCaseTest {
 
     @Test
     void shouldMarkPaymentAsPendingWhenExternalProcessorThrowsException() {
-        UUID orderId = UUID.randomUUID();
+        Long orderId = 1L;
         UUID clientId = UUID.randomUUID();
         BigDecimal amount = new BigDecimal("75.00");
 
@@ -179,7 +179,7 @@ class ProcessPaymentUseCaseTest {
 
     @Test
     void shouldReturnExistingPaymentWhenOrderAlreadyHasPayment() {
-        UUID orderId = UUID.randomUUID();
+        Long orderId = 1L;
         UUID clientId = UUID.randomUUID();
         BigDecimal amount = new BigDecimal("42.00");
         Payment existingPayment = Payment.createPending(orderId, clientId, amount);
@@ -216,7 +216,7 @@ class ProcessPaymentUseCaseTest {
 
     @Test
     void shouldReturnClaimedPaymentWithoutCallingExternalProcessorWhenAnotherFlowAlreadySavedIt() {
-        UUID orderId = UUID.randomUUID();
+        Long orderId = 1L;
         UUID clientId = UUID.randomUUID();
         BigDecimal amount = new BigDecimal("50.00");
 

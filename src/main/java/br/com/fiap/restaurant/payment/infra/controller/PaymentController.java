@@ -43,7 +43,7 @@ public class PaymentController {
     }
 
     @GetMapping("/order/{orderId}")
-    public PaymentResponse findByOrderId(@PathVariable UUID orderId) {
+    public PaymentResponse findByOrderId(@PathVariable Long orderId) {
         Payment payment = findPaymentByOrderIdUseCase.execute(orderId);
         return paymentControllerMapper.toResponse(payment);
     }

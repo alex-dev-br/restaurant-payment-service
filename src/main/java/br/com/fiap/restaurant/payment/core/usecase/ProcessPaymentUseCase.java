@@ -28,7 +28,7 @@ public class ProcessPaymentUseCase {
         this.paymentObservabilityGateway = paymentObservabilityGateway;
     }
 
-    public Payment execute(UUID orderId, UUID clientId, BigDecimal amount) {
+    public Payment execute(Long orderId, UUID clientId, BigDecimal amount) {
         return paymentObservabilityGateway.measureProcessing(() -> {
             paymentObservabilityGateway.logProcessingStarted(orderId, clientId, amount);
 
@@ -43,7 +43,7 @@ public class ProcessPaymentUseCase {
         return existingPayment;
     }
 
-    private Payment claimAndProcessPayment(UUID orderId, UUID clientId, BigDecimal amount) {
+    private Payment claimAndProcessPayment(Long orderId, UUID clientId, BigDecimal amount) {
         Payment newPayment = Payment.createPending(orderId, clientId, amount);
         Payment claimedPayment = paymentRepositoryGateway.save(newPayment);
 

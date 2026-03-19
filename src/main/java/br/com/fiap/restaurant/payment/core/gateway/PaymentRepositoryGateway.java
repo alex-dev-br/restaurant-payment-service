@@ -11,6 +11,6 @@ public interface PaymentRepositoryGateway {
 
     Payment save(Payment payment);
     Optional<Payment> findById(UUID id);
-    Optional<Payment> findByOrderId(UUID orderId);
+    Optional<Payment> findByOrderId(Long orderId);
     List<Payment> findByStatus(PaymentStatus status);
 }

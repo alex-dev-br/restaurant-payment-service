@@ -4,6 +4,7 @@ import br.com.fiap.restaurant.payment.core.gateway.ExternalPaymentProcessorGatew
 import br.com.fiap.restaurant.payment.core.usecase.ProcessPaymentUseCase;
 import br.com.fiap.restaurant.payment.infra.messaging.config.RabbitProperties;
 import br.com.fiap.restaurant.payment.infra.messaging.outbound.dto.PaymentEventMessage;
+import br.com.fiap.restaurant.payment.infra.persistence.repository.SpringDataPaymentRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.amqp.core.AmqpAdmin;
@@ -16,12 +17,10 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import java.math.BigDecimal;
 import java.util.UUID;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.when;
 
 @SpringBootTest(properties = {
@@ -43,18 +42,24 @@ class RabbitPaymentEventFlowIntegrationTest {
     @Autowired
     private RabbitProperties rabbitProperties;
 
+    @Autowired
+    private SpringDataPaymentRepository springDataPaymentRepository;
+
     @MockitoBean
     private ExternalPaymentProcessorGateway externalPaymentProcessorGateway;
 
     @BeforeEach
     void setUp() {
+        springDataPaymentRepository.deleteAll();
+        reset(externalPaymentProcessorGateway);
+
         purgeQueue(rabbitProperties.getQueue().getPaymentApprovedDebug());
         purgeQueue(rabbitProperties.getQueue().getPaymentPendingDebug());
     }
 
     @Test
     void shouldPublishApprovedEventToRabbit() {
-        UUID orderId = UUID.randomUUID();
+        Long orderId = nextOrderId();
         UUID clientId = UUID.randomUUID();
         BigDecimal amount = new BigDecimal("120.00");
 
@@ -66,31 +71,24 @@ class RabbitPaymentEventFlowIntegrationTest {
 
         processPaymentUseCase.execute(orderId, clientId, amount);
 
-        PaymentEventMessage approvedMessage =
-                receiveExpectedMessage(
-                        rabbitProperties.getQueue().getPaymentApprovedDebug(),
-                        PaymentEventMessage.class
-                );
+        PaymentEventMessage approvedMessage = receiveExpectedMessage(
+                rabbitProperties.getQueue().getPaymentApprovedDebug(),
+                PaymentEventMessage.class
+        );
 
-        assertNotNull(approvedMessage.paymentId());
-        assertEquals(orderId, approvedMessage.orderId());
-        assertEquals(clientId, approvedMessage.clientId());
-        assertEquals(amount, approvedMessage.amount());
-        assertEquals("APPROVED", approvedMessage.status());
-        assertNotNull(approvedMessage.occurredAt());
+        assertPaymentEvent(approvedMessage, orderId, clientId, amount, "APPROVED");
 
-        PaymentEventMessage pendingMessage =
-                receiveUnexpectedMessage(
-                        rabbitProperties.getQueue().getPaymentPendingDebug(),
-                        PaymentEventMessage.class
-                );
+        PaymentEventMessage pendingMessage = receiveUnexpectedMessage(
+                rabbitProperties.getQueue().getPaymentPendingDebug(),
+                PaymentEventMessage.class
+        );
 
         assertNull(pendingMessage);
     }
 
     @Test
     void shouldPublishPendingEventWhenProcessorFails() {
-        UUID orderId = UUID.randomUUID();
+        Long orderId = nextOrderId();
         UUID clientId = UUID.randomUUID();
         BigDecimal amount = new BigDecimal("150.00");
 
@@ -102,31 +100,24 @@ class RabbitPaymentEventFlowIntegrationTest {
 
         processPaymentUseCase.execute(orderId, clientId, amount);
 
-        PaymentEventMessage pendingMessage =
-                receiveExpectedMessage(
-                        rabbitProperties.getQueue().getPaymentPendingDebug(),
-                        PaymentEventMessage.class
-                );
+        PaymentEventMessage pendingMessage = receiveExpectedMessage(
+                rabbitProperties.getQueue().getPaymentPendingDebug(),
+                PaymentEventMessage.class
+        );
 
-        assertNotNull(pendingMessage.paymentId());
-        assertEquals(orderId, pendingMessage.orderId());
-        assertEquals(clientId, pendingMessage.clientId());
-        assertEquals(amount, pendingMessage.amount());
-        assertEquals("PENDING", pendingMessage.status());
-        assertNotNull(pendingMessage.occurredAt());
+        assertPaymentEvent(pendingMessage, orderId, clientId, amount, "PENDING");
 
-        PaymentEventMessage approvedMessage =
-                receiveUnexpectedMessage(
-                        rabbitProperties.getQueue().getPaymentApprovedDebug(),
-                        PaymentEventMessage.class
-                );
+        PaymentEventMessage approvedMessage = receiveUnexpectedMessage(
+                rabbitProperties.getQueue().getPaymentApprovedDebug(),
+                PaymentEventMessage.class
+        );
 
         assertNull(approvedMessage);
     }
 
     @Test
     void shouldPublishPendingEventWhenProcessorThrowsException() {
-        UUID orderId = UUID.randomUUID();
+        Long orderId = nextOrderId();
         UUID clientId = UUID.randomUUID();
         BigDecimal amount = new BigDecimal("180.00");
 
@@ -140,26 +131,39 @@ class RabbitPaymentEventFlowIntegrationTest {
 
         processPaymentUseCase.execute(orderId, clientId, amount);
 
-        PaymentEventMessage pendingMessage =
-                receiveExpectedMessage(
-                        rabbitProperties.getQueue().getPaymentPendingDebug(),
-                        PaymentEventMessage.class
-                );
+        PaymentEventMessage pendingMessage = receiveExpectedMessage(
+                rabbitProperties.getQueue().getPaymentPendingDebug(),
+                PaymentEventMessage.class
+        );
 
-        assertNotNull(pendingMessage.paymentId());
-        assertEquals(orderId, pendingMessage.orderId());
-        assertEquals(clientId, pendingMessage.clientId());
-        assertEquals(amount, pendingMessage.amount());
-        assertEquals("PENDING", pendingMessage.status());
-        assertNotNull(pendingMessage.occurredAt());
+        assertPaymentEvent(pendingMessage, orderId, clientId, amount, "PENDING");
 
-        PaymentEventMessage approvedMessage =
-                receiveUnexpectedMessage(
-                        rabbitProperties.getQueue().getPaymentApprovedDebug(),
-                        PaymentEventMessage.class
-                );
+        PaymentEventMessage approvedMessage = receiveUnexpectedMessage(
+                rabbitProperties.getQueue().getPaymentApprovedDebug(),
+                PaymentEventMessage.class
+        );
 
         assertNull(approvedMessage);
+    }
+
+    private Long nextOrderId() {
+        return Math.abs(UUID.randomUUID().getMostSignificantBits());
+    }
+
+    private void assertPaymentEvent(
+            PaymentEventMessage message,
+            Long expectedOrderId,
+            UUID expectedClientId,
+            BigDecimal expectedAmount,
+            String expectedStatus
+    ) {
+        assertNotNull(message);
+        assertNotNull(message.paymentId());
+        assertEquals(expectedOrderId, message.orderId());
+        assertEquals(expectedClientId, message.clientId());
+        assertEquals(expectedAmount, message.amount());
+        assertEquals(expectedStatus, message.status());
+        assertNotNull(message.occurredAt());
     }
 
     private void purgeQueue(String queueName) {

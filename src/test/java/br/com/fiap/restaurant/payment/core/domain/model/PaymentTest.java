@@ -12,7 +12,7 @@ class PaymentTest {
 
     @Test
     void shouldCreatePendingPaymentSuccessfully() {
-        UUID orderId = UUID.randomUUID();
+        Long orderId = 1L;
         UUID clientId = UUID.randomUUID();
         BigDecimal amount = new BigDecimal("89.90");
 
@@ -31,7 +31,7 @@ class PaymentTest {
     void shouldApprovePaymentSuccessfully() {
         Payment payment = new Payment(
                 UUID.randomUUID(),
-                UUID.randomUUID(),
+                1L,
                 UUID.randomUUID(),
                 new BigDecimal("35.50"),
                 PaymentStatus.PENDING,
@@ -51,7 +51,7 @@ class PaymentTest {
                 IllegalArgumentException.class,
                 () -> new Payment(
                         UUID.randomUUID(),
-                        UUID.randomUUID(),
+                        1L,
                         UUID.randomUUID(),
                         BigDecimal.ZERO,
                         PaymentStatus.PENDING,
@@ -87,7 +87,7 @@ class PaymentTest {
                 IllegalArgumentException.class,
                 () -> new Payment(
                         UUID.randomUUID(),
-                        UUID.randomUUID(),
+                        1L,
                         null,
                         new BigDecimal("10.00"),
                         PaymentStatus.PENDING,

@@ -52,7 +52,7 @@ public class PaymentRepositoryAdapter implements PaymentRepositoryGateway {
     }
 
     @Override
-    public Optional<Payment> findByOrderId(UUID orderId) {
+    public Optional<Payment> findByOrderId(Long orderId) {
         return repository.findByOrderId(orderId)
                 .map(mapper::toDomain);
     }

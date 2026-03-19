@@ -48,7 +48,7 @@ class RetryPendingPaymentsUseCaseTest {
                 .thenReturn(List.of(pendingPayment));
 
         when(externalPaymentProcessorGateway.process(
-                pendingPayment.getOrderId(),
+                pendingPayment.getId(),
                 pendingPayment.getClientId(),
                 pendingPayment.getAmount()
         )).thenReturn(true);
@@ -61,7 +61,7 @@ class RetryPendingPaymentsUseCaseTest {
         verify(paymentRepositoryGateway).findByStatus(PaymentStatus.PENDING);
         verify(paymentObservabilityGateway).logExternalProcessingStarted(pendingPayment);
         verify(externalPaymentProcessorGateway).process(
-                pendingPayment.getOrderId(),
+                pendingPayment.getId(),
                 pendingPayment.getClientId(),
                 pendingPayment.getAmount()
         );
@@ -81,7 +81,7 @@ class RetryPendingPaymentsUseCaseTest {
                 .thenReturn(List.of(pendingPayment));
 
         when(externalPaymentProcessorGateway.process(
-                pendingPayment.getOrderId(),
+                pendingPayment.getId(),
                 pendingPayment.getClientId(),
                 pendingPayment.getAmount()
         )).thenReturn(false);
@@ -94,7 +94,7 @@ class RetryPendingPaymentsUseCaseTest {
         verify(paymentRepositoryGateway).findByStatus(PaymentStatus.PENDING);
         verify(paymentObservabilityGateway).logExternalProcessingStarted(pendingPayment);
         verify(externalPaymentProcessorGateway).process(
-                pendingPayment.getOrderId(),
+                pendingPayment.getId(),
                 pendingPayment.getClientId(),
                 pendingPayment.getAmount()
         );
@@ -114,7 +114,7 @@ class RetryPendingPaymentsUseCaseTest {
                 .thenReturn(List.of(pendingPayment));
 
         when(externalPaymentProcessorGateway.process(
-                pendingPayment.getOrderId(),
+                pendingPayment.getId(),
                 pendingPayment.getClientId(),
                 pendingPayment.getAmount()
         )).thenThrow(new RuntimeException("processor unavailable"));
@@ -127,7 +127,7 @@ class RetryPendingPaymentsUseCaseTest {
         verify(paymentRepositoryGateway).findByStatus(PaymentStatus.PENDING);
         verify(paymentObservabilityGateway).logExternalProcessingStarted(pendingPayment);
         verify(externalPaymentProcessorGateway).process(
-                pendingPayment.getOrderId(),
+                pendingPayment.getId(),
                 pendingPayment.getClientId(),
                 pendingPayment.getAmount()
         );
@@ -145,7 +145,7 @@ class RetryPendingPaymentsUseCaseTest {
     private Payment buildPendingPayment() {
         return new Payment(
                 UUID.randomUUID(),
-                UUID.randomUUID(),
+                100L,
                 UUID.randomUUID(),
                 new BigDecimal("150.00"),
                 PaymentStatus.PENDING,

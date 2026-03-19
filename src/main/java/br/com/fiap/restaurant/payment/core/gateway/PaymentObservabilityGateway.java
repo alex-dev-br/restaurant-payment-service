@@ -8,7 +8,7 @@ import java.util.function.Supplier;
 
 public interface PaymentObservabilityGateway {
 
-    void logProcessingStarted(UUID orderId, UUID clientId, BigDecimal amount);
+    void logProcessingStarted(Long orderId, UUID clientId, BigDecimal amount);
 
     void logIdempotentReuse(Payment payment);
 

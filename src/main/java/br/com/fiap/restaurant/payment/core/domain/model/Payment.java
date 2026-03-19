@@ -8,7 +8,7 @@ import java.util.UUID;
 public class Payment {
 
     private UUID id;
-    private UUID orderId;
+    private Long orderId;
     private UUID clientId;
     private BigDecimal amount;
     private PaymentStatus status;
@@ -17,7 +17,7 @@ public class Payment {
 
     public Payment(
             UUID id,
-            UUID orderId,
+            Long orderId,
             UUID clientId,
             BigDecimal amount,
             PaymentStatus status,
@@ -35,7 +35,7 @@ public class Payment {
         this.updatedAt = updatedAt;
     }
 
-    public static Payment createPending(UUID orderId, UUID clientId, BigDecimal amount) {
+    public static Payment createPending(Long orderId, UUID clientId, BigDecimal amount) {
         OffsetDateTime now = OffsetDateTime.now();
 
         return new Payment(
@@ -65,14 +65,13 @@ public class Payment {
 
     private static void validate(
             UUID id,
-            UUID orderId,
+            Long orderId,
             UUID clientId,
             BigDecimal amount,
             PaymentStatus status,
             OffsetDateTime createdAt,
             OffsetDateTime updatedAt
     ) {
-
         if (id == null) {
             throw new IllegalArgumentException("O identificador do pagamento (id) é obrigatório.");
         }
@@ -110,7 +109,7 @@ public class Payment {
         return id;
     }
 
-    public UUID getOrderId() {
+    public Long getOrderId() {
         return orderId;
     }
 

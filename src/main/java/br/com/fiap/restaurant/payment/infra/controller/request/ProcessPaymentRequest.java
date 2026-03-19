@@ -9,7 +9,7 @@ import java.util.UUID;
 public record ProcessPaymentRequest(
 
         @NotNull(message = "orderId é obrigatório")
-        UUID orderId,
+        Long orderId,
 
         @NotNull(message = "clientId é obrigatório")
         UUID clientId,

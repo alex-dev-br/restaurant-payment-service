@@ -32,7 +32,7 @@ class PaymentRepositoryAdapterIdempotencyTest {
     @Test
     void shouldReturnExistingPaymentWhenSaveFailsDueToUniqueConstraint() {
         UUID paymentId = UUID.randomUUID();
-        UUID orderId = UUID.randomUUID();
+        Long orderId = 1L;
         UUID clientId = UUID.randomUUID();
         OffsetDateTime now = OffsetDateTime.now();
 

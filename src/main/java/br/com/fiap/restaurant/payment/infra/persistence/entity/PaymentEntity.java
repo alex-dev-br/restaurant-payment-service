@@ -17,7 +17,7 @@ public class PaymentEntity {
     private UUID id;
 
     @Column(name = "order_id", nullable = false, unique = true)
-    private UUID orderId;
+    private Long orderId;
 
     @Column(name = "client_id", nullable = false)
     private UUID clientId;
@@ -39,7 +39,7 @@ public class PaymentEntity {
 
     public PaymentEntity(
             UUID id,
-            UUID orderId,
+            Long orderId,
             UUID clientId,
             BigDecimal amount,
             String status,
@@ -63,11 +63,11 @@ public class PaymentEntity {
         this.id = id;
     }
 
-    public UUID getOrderId() {
+    public Long getOrderId() {
         return orderId;
     }
 
-    public void setOrderId(UUID orderId) {
+    public void setOrderId(Long orderId) {
         this.orderId = orderId;
     }
 

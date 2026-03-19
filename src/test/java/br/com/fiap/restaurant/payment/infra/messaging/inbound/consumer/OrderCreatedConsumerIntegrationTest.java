@@ -52,7 +52,7 @@ class OrderCreatedConsumerIntegrationTest {
 
     @Test
     void shouldConsumeOrderCreatedMessageAndInvokeProcessPaymentUseCase() {
-        UUID orderId = UUID.randomUUID();
+        Long orderId = 1L;
         UUID clientId = UUID.randomUUID();
         BigDecimal amount = new BigDecimal("120.00");
 
@@ -64,7 +64,7 @@ class OrderCreatedConsumerIntegrationTest {
                 message
         );
 
-        ArgumentCaptor<UUID> orderIdCaptor = ArgumentCaptor.forClass(UUID.class);
+        ArgumentCaptor<Long> orderIdCaptor = ArgumentCaptor.forClass(Long.class);
         ArgumentCaptor<UUID> clientIdCaptor = ArgumentCaptor.forClass(UUID.class);
         ArgumentCaptor<BigDecimal> amountCaptor = ArgumentCaptor.forClass(BigDecimal.class);
 

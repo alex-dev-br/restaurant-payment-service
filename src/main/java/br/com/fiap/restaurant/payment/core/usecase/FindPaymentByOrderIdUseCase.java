@@ -13,7 +13,7 @@ public class FindPaymentByOrderIdUseCase {
         this.paymentRepositoryGateway = paymentRepositoryGateway;
     }
 
-    public Payment execute(UUID orderId) {
+    public Payment execute(Long orderId) {
         return paymentRepositoryGateway.findByOrderId(orderId)
                 .orElseThrow(() -> new IllegalArgumentException(
                         "Pagamento não encontrado para o orderId: " + orderId

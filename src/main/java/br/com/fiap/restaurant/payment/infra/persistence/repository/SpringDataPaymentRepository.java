@@ -9,6 +9,6 @@ import java.util.UUID;
 
 public interface SpringDataPaymentRepository extends JpaRepository<PaymentEntity, UUID> {
 
-    Optional<PaymentEntity> findByOrderId(UUID orderId);
+    Optional<PaymentEntity> findByOrderId(Long orderId);
     List<PaymentEntity> findByStatus(String status);
 }

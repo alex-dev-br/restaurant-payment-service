@@ -1,6 +1,6 @@
 create table payments (
                           id uuid primary key,
-                          order_id uuid not null,
+                          order_id bigint not null,
                           client_id uuid not null,
                           status varchar(30) not null,
                           amount numeric(19,2) not null,

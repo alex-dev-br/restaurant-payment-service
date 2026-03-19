@@ -4,7 +4,7 @@ import java.math.BigDecimal;
 import java.util.UUID;
 
 public record OrderCreatedMessage(
-        UUID orderId,
+        Long orderId,
         UUID clientId,
         BigDecimal amount
 ) {
