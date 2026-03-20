@@ -8,6 +8,7 @@ import br.com.fiap.restaurant.payment.infra.persistence.repository.SpringDataPay
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Component;
 
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -60,6 +61,14 @@ public class PaymentRepositoryAdapter implements PaymentRepositoryGateway {
     @Override
     public List<Payment> findByStatus(PaymentStatus status) {
         return repository.findByStatus(status.name())
+                .stream()
+                .map(mapper::toDomain)
+                .toList();
+    }
+
+    @Override
+    public List<Payment> findRetryablePendingPayments(OffsetDateTime referenceTime) {
+        return repository.findRetryablePendingPayments(referenceTime)
                 .stream()
                 .map(mapper::toDomain)
                 .toList();

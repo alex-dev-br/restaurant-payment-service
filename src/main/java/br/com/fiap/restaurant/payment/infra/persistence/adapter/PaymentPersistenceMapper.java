@@ -16,7 +16,10 @@ public class PaymentPersistenceMapper {
                 payment.getAmount(),
                 payment.getStatus().name(),
                 payment.getCreatedAt(),
-                payment.getUpdatedAt()
+                payment.getUpdatedAt(),
+                payment.getRetryCount(),
+                payment.getLastRetryAt(),
+                payment.getNextRetryAt()
         );
     }
 
@@ -28,7 +31,10 @@ public class PaymentPersistenceMapper {
                 entity.getAmount(),
                 PaymentStatus.valueOf(entity.getStatus()),
                 entity.getCreatedAt(),
-                entity.getUpdatedAt()
+                entity.getUpdatedAt(),
+                entity.getRetryCount(),
+                entity.getLastRetryAt(),
+                entity.getNextRetryAt()
         );
     }
 }

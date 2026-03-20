@@ -12,6 +12,8 @@ import br.com.fiap.restaurant.payment.core.usecase.RetryPendingPaymentsUseCase;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+import java.time.Duration;
+
 @Configuration
 public class UseCaseConfig {
 
@@ -53,13 +55,15 @@ public class UseCaseConfig {
             PaymentRepositoryGateway paymentRepositoryGateway,
             ExternalPaymentProcessorGateway externalPaymentProcessorGateway,
             PaymentEventPublisherGateway paymentEventPublisherGateway,
-            PaymentObservabilityGateway paymentObservabilityGateway
+            PaymentObservabilityGateway paymentObservabilityGateway,
+            PaymentRetrySchedulerProperties paymentRetrySchedulerProperties
     ) {
         return new RetryPendingPaymentsUseCase(
                 paymentRepositoryGateway,
                 externalPaymentProcessorGateway,
                 paymentEventPublisherGateway,
-                paymentObservabilityGateway
+                paymentObservabilityGateway,
+                Duration.ofMillis(paymentRetrySchedulerProperties.getFixedDelayMs())
         );
     }
 }

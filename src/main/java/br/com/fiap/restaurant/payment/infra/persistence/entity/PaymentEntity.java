@@ -34,6 +34,15 @@ public class PaymentEntity {
     @Column(name = "updated_at", nullable = false)
     private OffsetDateTime updatedAt;
 
+    @Column(name = "retry_count", nullable = false)
+    private int retryCount;
+
+    @Column(name = "last_retry_at")
+    private OffsetDateTime lastRetryAt;
+
+    @Column(name = "next_retry_at")
+    private OffsetDateTime nextRetryAt;
+
     public PaymentEntity() {
     }
 
@@ -46,6 +55,32 @@ public class PaymentEntity {
             OffsetDateTime createdAt,
             OffsetDateTime updatedAt
     ) {
+        this(
+                id,
+                orderId,
+                clientId,
+                amount,
+                status,
+                createdAt,
+                updatedAt,
+                0,
+                null,
+                null
+        );
+    }
+
+    public PaymentEntity(
+            UUID id,
+            Long orderId,
+            UUID clientId,
+            BigDecimal amount,
+            String status,
+            OffsetDateTime createdAt,
+            OffsetDateTime updatedAt,
+            int retryCount,
+            OffsetDateTime lastRetryAt,
+            OffsetDateTime nextRetryAt
+    ) {
         this.id = id;
         this.orderId = orderId;
         this.clientId = clientId;
@@ -53,6 +88,9 @@ public class PaymentEntity {
         this.status = status;
         this.createdAt = createdAt;
         this.updatedAt = updatedAt;
+        this.retryCount = retryCount;
+        this.lastRetryAt = lastRetryAt;
+        this.nextRetryAt = nextRetryAt;
     }
 
     public UUID getId() {
@@ -71,9 +109,13 @@ public class PaymentEntity {
         this.orderId = orderId;
     }
 
-    public UUID getClientId() { return clientId; }
+    public UUID getClientId() {
+        return clientId;
+    }
 
-    public void setClientId(UUID clientId) { this.clientId = clientId; }
+    public void setClientId(UUID clientId) {
+        this.clientId = clientId;
+    }
 
     public BigDecimal getAmount() {
         return amount;
@@ -105,5 +147,29 @@ public class PaymentEntity {
 
     public void setUpdatedAt(OffsetDateTime updatedAt) {
         this.updatedAt = updatedAt;
+    }
+
+    public int getRetryCount() {
+        return retryCount;
+    }
+
+    public void setRetryCount(int retryCount) {
+        this.retryCount = retryCount;
+    }
+
+    public OffsetDateTime getLastRetryAt() {
+        return lastRetryAt;
+    }
+
+    public void setLastRetryAt(OffsetDateTime lastRetryAt) {
+        this.lastRetryAt = lastRetryAt;
+    }
+
+    public OffsetDateTime getNextRetryAt() {
+        return nextRetryAt;
+    }
+
+    public void setNextRetryAt(OffsetDateTime nextRetryAt) {
+        this.nextRetryAt = nextRetryAt;
     }
 }

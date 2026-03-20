@@ -2,6 +2,7 @@ package br.com.fiap.restaurant.payment.core.domain.model;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.util.Objects;
 import java.util.UUID;
@@ -15,6 +16,9 @@ public class Payment {
     private PaymentStatus status;
     private OffsetDateTime createdAt;
     private OffsetDateTime updatedAt;
+    private int retryCount;
+    private OffsetDateTime lastRetryAt;
+    private OffsetDateTime nextRetryAt;
 
     public Payment(
             UUID id,
@@ -25,9 +29,44 @@ public class Payment {
             OffsetDateTime createdAt,
             OffsetDateTime updatedAt
     ) {
+        this(
+                id,
+                orderId,
+                clientId,
+                amount,
+                status,
+                createdAt,
+                updatedAt,
+                0,
+                null,
+                null
+        );
+    }
+
+    public Payment(
+            UUID id,
+            Long orderId,
+            UUID clientId,
+            BigDecimal amount,
+            PaymentStatus status,
+            OffsetDateTime createdAt,
+            OffsetDateTime updatedAt,
+            int retryCount,
+            OffsetDateTime lastRetryAt,
+            OffsetDateTime nextRetryAt
+    ) {
         BigDecimal normalizedAmount = normalizeAmount(amount);
 
-        validate(id, orderId, clientId, normalizedAmount, status, createdAt, updatedAt);
+        validate(
+                id,
+                orderId,
+                clientId,
+                normalizedAmount,
+                status,
+                createdAt,
+                updatedAt,
+                retryCount
+        );
 
         this.id = id;
         this.orderId = orderId;
@@ -36,6 +75,9 @@ public class Payment {
         this.status = status;
         this.createdAt = createdAt;
         this.updatedAt = updatedAt;
+        this.retryCount = retryCount;
+        this.lastRetryAt = lastRetryAt;
+        this.nextRetryAt = nextRetryAt;
     }
 
     public static Payment createPending(Long orderId, UUID clientId, BigDecimal amount) {
@@ -48,18 +90,38 @@ public class Payment {
                 amount,
                 PaymentStatus.PENDING,
                 now,
-                now
+                now,
+                0,
+                null,
+                null
         );
     }
 
     public void approve() {
         this.status = PaymentStatus.APPROVED;
         this.updatedAt = OffsetDateTime.now();
+        clearRetryMetadata();
     }
 
     public void markAsPending() {
         this.status = PaymentStatus.PENDING;
         this.updatedAt = OffsetDateTime.now();
+    }
+
+    public void registerRetryFailure(Duration backoff) {
+        OffsetDateTime now = OffsetDateTime.now();
+
+        this.status = PaymentStatus.PENDING;
+        this.updatedAt = now;
+        this.retryCount = this.retryCount + 1;
+        this.lastRetryAt = now;
+        this.nextRetryAt = now.plus(backoff);
+    }
+
+    private void clearRetryMetadata() {
+        this.retryCount = 0;
+        this.lastRetryAt = null;
+        this.nextRetryAt = null;
     }
 
     public boolean isApproved() {
@@ -88,7 +150,8 @@ public class Payment {
             BigDecimal amount,
             PaymentStatus status,
             OffsetDateTime createdAt,
-            OffsetDateTime updatedAt
+            OffsetDateTime updatedAt,
+            int retryCount
     ) {
         if (id == null) {
             throw new IllegalArgumentException("O identificador do pagamento (id) é obrigatório.");
@@ -121,6 +184,10 @@ public class Payment {
         if (updatedAt == null) {
             throw new IllegalArgumentException("A data de atualização do pagamento (updatedAt) é obrigatória.");
         }
+
+        if (retryCount < 0) {
+            throw new IllegalArgumentException("O contador de tentativas de retry não pode ser negativo.");
+        }
     }
 
     public UUID getId() {
@@ -149,6 +216,18 @@ public class Payment {
 
     public OffsetDateTime getUpdatedAt() {
         return updatedAt;
+    }
+
+    public int getRetryCount() {
+        return retryCount;
+    }
+
+    public OffsetDateTime getLastRetryAt() {
+        return lastRetryAt;
+    }
+
+    public OffsetDateTime getNextRetryAt() {
+        return nextRetryAt;
     }
 
     @Override

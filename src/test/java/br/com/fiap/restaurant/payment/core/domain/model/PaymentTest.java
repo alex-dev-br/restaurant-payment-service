@@ -127,4 +127,37 @@ class PaymentTest {
 
         assertEquals("O identificador do cliente (clientId) é obrigatório.", exception.getMessage());
     }
+
+    @Test
+    void shouldRegisterRetryFailure() {
+        Payment payment = Payment.createPending(
+                1L,
+                UUID.randomUUID(),
+                new BigDecimal("10.00")
+        );
+
+        payment.registerRetryFailure(java.time.Duration.ofSeconds(30));
+
+        assertEquals(PaymentStatus.PENDING, payment.getStatus());
+        assertEquals(1, payment.getRetryCount());
+        assertNotNull(payment.getLastRetryAt());
+        assertNotNull(payment.getNextRetryAt());
+    }
+
+    @Test
+    void shouldClearRetryMetadataWhenApproved() {
+        Payment payment = Payment.createPending(
+                1L,
+                UUID.randomUUID(),
+                new BigDecimal("10.00")
+        );
+
+        payment.registerRetryFailure(java.time.Duration.ofSeconds(30));
+        payment.approve();
+
+        assertEquals(PaymentStatus.APPROVED, payment.getStatus());
+        assertEquals(0, payment.getRetryCount());
+        assertNull(payment.getLastRetryAt());
+        assertNull(payment.getNextRetryAt());
+    }
 }
