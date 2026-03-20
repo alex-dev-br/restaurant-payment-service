@@ -2,7 +2,7 @@
 
 Microsserviço responsável pelo **processamento de pagamentos** no ecossistema **Restaurant FIAP**.
 
-O serviço consome eventos de criação de pedidos, processa o pagamento por meio de um processador externo e publica eventos informando o resultado do pagamento.
+O serviço consome eventos de criação de pedidos, processa pagamentos por meio de um processador externo, persiste o estado do pagamento, registra eventos em **outbox** e publica eventos com o resultado do processamento.
 
 O projeto foi desenvolvido com foco em:
 
@@ -11,6 +11,7 @@ O projeto foi desenvolvido com foco em:
 - **resiliência**
 - **idempotência**
 - **testabilidade**
+- **outbox pattern**
 - **separação clara entre domínio e infraestrutura**
 
 ---
@@ -21,54 +22,61 @@ O projeto foi desenvolvido com foco em:
 - [📑 Sumário](#-sumário)
 - [🎯 Objetivo do Serviço](#-objetivo-do-serviço)
 - [🏗 Arquitetura](#-arquitetura)
-    - [📐 Clean Architecture Diagram](#-clean-architecture-diagram)
+  - [📐 Clean Architecture Diagram](#-clean-architecture-diagram)
 - [📡 Arquitetura Orientada a Eventos](#-arquitetura-orientada-a-eventos)
-    - [🐇 Topologia RabbitMQ](#-topologia-rabbitmq)
+  - [🐇 Topologia RabbitMQ](#-topologia-rabbitmq)
 - [🔄 Fluxo de Processamento do Pagamento](#-fluxo-de-processamento-do-pagamento)
+- [📤 Padrão Outbox](#-padrão-outbox)
 - [🌐 API HTTP](#-api-http)
-    - [Endpoints disponíveis](#endpoints-disponíveis)
-    - [Exemplos cURL](#exemplos-curl)
+  - [Endpoints disponíveis](#endpoints-disponíveis)
+  - [Exemplos cURL](#exemplos-curl)
+  - [Tratamento de erros](#tratamento-de-erros)
 - [🌐 Integração com Processador de Pagamentos](#-integração-com-processador-de-pagamentos)
-    - [Endpoints utilizados](#endpoints-utilizados)
-    - [Fluxo de integração](#fluxo-de-integração)
-    - [Observações importantes](#observações-importantes)
+  - [Endpoints utilizados](#endpoints-utilizados)
+  - [Fluxo de integração](#fluxo-de-integração)
+  - [Observações importantes](#observações-importantes)
 - [💰 Contrato Monetário](#-contrato-monetário)
-    - [Representação interna do domínio](#representação-interna-do-domínio)
-    - [Representação exigida pelo `procpag`](#representação-exigida-pelo-procpag)
-    - [Convenção adotada](#convenção-adotada)
-    - [Regra de validação](#regra-de-validação)
-    - [Decisão arquitetural](#decisão-arquitetural)
+  - [Representação interna do domínio](#representação-interna-do-domínio)
+  - [Representação exigida pelo `procpag`](#representação-exigida-pelo-procpag)
+  - [Convenção adotada](#convenção-adotada)
+  - [Regra de validação](#regra-de-validação)
+  - [Decisão arquitetural](#decisão-arquitetural)
 - [🛡 Resiliência](#-resiliência)
 - [🔁 Retry de Pagamentos Pendentes](#-retry-de-pagamentos-pendentes)
-    - [Fluxo esperado](#fluxo-esperado)
-    - [Configuração](#configuração)
+  - [Fluxo esperado](#fluxo-esperado)
+  - [Política de retry](#política-de-retry)
+  - [Configuração](#configuração)
 - [📡 Eventos do Sistema](#-eventos-do-sistema)
-    - [Evento Consumido](#evento-consumido)
-    - [Eventos Publicados](#eventos-publicados)
+  - [Evento Consumido](#evento-consumido)
+  - [Eventos Publicados](#eventos-publicados)
 - [🧠 Regras de Negócio](#-regras-de-negócio)
-    - [Idempotência](#idempotência)
-    - [Regra adicional de valor monetário](#regra-adicional-de-valor-monetário)
+  - [Idempotência](#idempotência)
+  - [Falha definitiva](#falha-definitiva)
+  - [Regra adicional de valor monetário](#regra-adicional-de-valor-monetário)
 - [📊 Observabilidade](#-observabilidade)
-    - [Métricas registradas](#métricas-registradas)
-    - [Logs relevantes](#logs-relevantes)
+  - [Métricas registradas](#métricas-registradas)
+  - [Logs relevantes](#logs-relevantes)
 - [🗄 Banco de Dados](#-banco-de-dados)
-    - [Migration inicial](#migration-inicial)
-    - [Migration de idempotência](#migration-de-idempotência)
+  - [Migration inicial](#migration-inicial)
+  - [Migration de idempotência](#migration-de-idempotência)
+  - [Migration de metadados de retry](#migration-de-metadados-de-retry)
+  - [Migration de outbox](#migration-de-outbox)
 - [🧪 Cenários Validados](#-cenários-validados)
 - [🛠 Stack Tecnológica](#-stack-tecnológica)
 - [📂 Estrutura do Projeto](#-estrutura-do-projeto)
 - [🐳 Execução Local](#-execução-local)
-    - [Pré-requisitos](#pré-requisitos)
-    - [Subida local passo a passo](#subida-local-passo-a-passo)
+  - [Pré-requisitos](#pré-requisitos)
+  - [Subida local passo a passo](#subida-local-passo-a-passo)
 - [⚙ Configuração Principal](#-configuração-principal)
+- [🧪 Perfil de Teste](#-perfil-de-teste)
 - [🧪 Testes](#-testes)
-- [🔄 Integração Contínua](#-integração-contínua)
 - [🧭 Architecture Decision Records](#-architecture-decision-records)
-    - [ADR-001 — Clean Architecture](#adr-001--clean-architecture)
-    - [ADR-002 — Comunicação Assíncrona com RabbitMQ](#adr-002--comunicação-assíncrona-com-rabbitmq)
-    - [ADR-003 — Idempotência](#adr-003--idempotência)
-    - [ADR-004 — Resiliência na Integração Externa](#adr-004--resiliência-na-integração-externa)
-    - [ADR-005 — Contrato Monetário com o Processador Externo](#adr-005--contrato-monetário-com-o-processador-externo)
+  - [ADR-001 — Clean Architecture](#adr-001--clean-architecture)
+  - [ADR-002 — Comunicação Assíncrona com RabbitMQ](#adr-002--comunicação-assíncrona-com-rabbitmq)
+  - [ADR-003 — Idempotência](#adr-003--idempotência)
+  - [ADR-004 — Resiliência na Integração Externa](#adr-004--resiliência-na-integração-externa)
+  - [ADR-005 — Contrato Monetário com o Processador Externo](#adr-005--contrato-monetário-com-o-processador-externo)
+  - [ADR-006 — Publicação de Eventos via Outbox](#adr-006--publicação-de-eventos-via-outbox)
 
 ---
 
@@ -77,19 +85,21 @@ O projeto foi desenvolvido com foco em:
 O `payment-service` é responsável por:
 
 - consumir eventos de criação de pedido
-- iniciar o processamento do pagamento
+- processar pagamentos
 - persistir o estado do pagamento
 - consultar pagamentos por `orderId`
-- publicar eventos com o resultado do pagamento
 - evitar duplicidade de processamento
 - lidar com falhas transitórias do processador externo
 - reprocessar pagamentos pendentes
+- marcar pagamentos como `FAILED` ao atingir o limite de tentativas
+- registrar eventos em **outbox**
+- publicar eventos de pagamento no RabbitMQ
 
 ---
 
 # 🏗 Arquitetura
 
-O serviço segue os princípios da **Clean Architecture (Robert C. Martin)**, garantindo:
+O serviço segue os princípios da **Clean Architecture (Robert C. Martin)**, promovendo:
 
 - baixo acoplamento
 - alta testabilidade
@@ -105,8 +115,7 @@ As dependências sempre apontam **para o domínio**.
 ```mermaid
 flowchart TB
 
-Frameworks[Spring Boot / RabbitMQ / PostgreSQL]
-
+Frameworks[Spring Boot / RabbitMQ / PostgreSQL / Procpag]
 Adapters[Interface Adapters]
 UseCases[Use Cases]
 Entities[Domain Entities]
@@ -114,13 +123,15 @@ Entities[Domain Entities]
 Frameworks --> Adapters
 Adapters --> UseCases
 UseCases --> Entities
-```
+````
 
 ---
 
 # 📡 Arquitetura Orientada a Eventos
 
 O sistema utiliza **mensageria assíncrona** com **RabbitMQ** para comunicação entre microsserviços.
+
+Além disso, o serviço adota **Outbox Pattern** para desacoplar a persistência do pagamento da publicação do evento no broker.
 
 ```mermaid
 flowchart LR
@@ -129,11 +140,13 @@ OrderService -->|order.created| PaymentService
 
 PaymentService -->|HTTP| ExternalProcessor
 PaymentService -->|persistência| PostgreSQL
+PaymentService -->|grava evento pendente| Outbox[(payment_outbox)]
 
-PaymentService -->|payment.approved| RabbitMQ
-PaymentService -->|payment.pending| RabbitMQ
+Outbox -->|publisher| RabbitMQ
 
-RabbitMQ --> OrderService
+RabbitMQ -->|payment.approved| OrderService
+RabbitMQ -->|payment.pending| OrderService
+RabbitMQ -->|payment.failed| OrderService
 RabbitMQ --> OtherServices
 ```
 
@@ -142,25 +155,33 @@ RabbitMQ --> OtherServices
 ## 🐇 Topologia RabbitMQ
 
 ### Exchanges
-- `ex.order`
-- `ex.payment`
+
+* `ex.order`
+* `ex.payment`
 
 ### Routing keys
-- `order.created`
-- `payment.approved`
-- `payment.pending`
+
+* `order.created`
+* `payment.approved`
+* `payment.pending`
+* `payment.failed`
 
 ### Queue consumida pelo `payment-service`
-- `payment.order.created`
+
+* `payment.order.created`
 
 ### Queues auxiliares / debug
-- `payment.approved.debug`
-- `payment.pending.debug`
+
+* `payment.approved.debug`
+* `payment.pending.debug`
+* `payment.failed.debug`
 
 ### Dead Letter Queues
-- `payment.order.created.dlq`
-- `payment.approved.debug.dlq`
-- `payment.pending.debug.dlq`
+
+* `payment.order.created.dlq`
+* `payment.approved.debug.dlq`
+* `payment.pending.debug.dlq`
+* `payment.failed.debug.dlq`
 
 ---
 
@@ -173,29 +194,53 @@ participant OrderService
 participant PaymentService
 participant Processor
 participant Database
+participant Outbox
 participant RabbitMQ
 
 OrderService->>PaymentService: order.created
-
 PaymentService->>Database: verificar pagamento existente
 
 alt pagamento já existe
-    PaymentService-->>OrderService: reutiliza pagamento (idempotência)
+    PaymentService->>Database: reutiliza pagamento existente
 else novo pagamento
-    PaymentService->>Database: salvar pagamento pendente
+    PaymentService->>Database: salvar pagamento
     PaymentService->>Processor: processar pagamento
-    
+
     alt pagamento aprovado
         Processor-->>PaymentService: sucesso
-        PaymentService->>Database: atualizar status
-        PaymentService->>RabbitMQ: payment.approved
-    else erro ou rejeição
+        PaymentService->>Database: atualizar status para APPROVED
+        PaymentService->>Outbox: registrar payment.approved
+    else erro, rejeição ou indisponibilidade
         Processor-->>PaymentService: falha
-        PaymentService->>Database: manter pendente
-        PaymentService->>RabbitMQ: payment.pending
+        PaymentService->>Database: atualizar status para PENDING + retry metadata
+        PaymentService->>Outbox: registrar payment.pending
     end
 end
+
+Outbox->>RabbitMQ: publicar eventos pendentes
 ```
+
+---
+
+# 📤 Padrão Outbox
+
+O serviço utiliza **Outbox Pattern** para garantir consistência entre a persistência do pagamento e a publicação do evento de saída.
+
+## Como funciona
+
+1. o caso de uso decide o estado imediato do pagamento
+2. o pagamento é persistido
+3. no mesmo fluxo, é criado um registro em `payment_outbox`
+4. um publisher dedicado busca eventos pendentes
+5. os eventos são publicados no RabbitMQ
+6. após sucesso, o status do outbox é atualizado para `PUBLISHED`
+
+## Benefícios
+
+* reduz acoplamento entre banco e broker
+* evita perda silenciosa de eventos
+* permite retry de publicação
+* melhora auditabilidade do fluxo assíncrono
 
 ---
 
@@ -205,9 +250,9 @@ O serviço também expõe endpoints REST para processamento manual e consulta de
 
 ## Endpoints disponíveis
 
-| Método | Endpoint                    | Descrição |
-| ------ | --------------------------- | --------- |
-| POST   | `/payments/process`         | Processa um pagamento |
+| Método | Endpoint                    | Descrição                     |
+| ------ | --------------------------- | ----------------------------- |
+| POST   | `/payments/process`         | Processa um pagamento         |
 | GET    | `/payments/order/{orderId}` | Busca pagamento por `orderId` |
 
 ---
@@ -246,13 +291,29 @@ curl http://localhost:8083/payments/order/12345
 }
 ```
 
+---
+
+## Tratamento de erros
+
+O serviço possui tratamento global de exceções para:
+
+* `PaymentNotFoundException` → `404 Not Found`
+* `IllegalArgumentException` → `400 Bad Request`
+* `MethodArgumentNotValidException` → `400 Bad Request`
+
 ### Exemplo de erro de validação
 
 ```json
 {
-  "amount": "amount deve ser maior que zero",
-  "clientId": "clientId é obrigatório",
-  "orderId": "orderId é obrigatório"
+  "timestamp": "2026-03-20T12:00:00Z",
+  "status": 400,
+  "error": "Bad Request",
+  "message": "Erro de validação",
+  "fields": {
+    "amount": "amount deve ter no máximo 2 casas decimais",
+    "clientId": "clientId é obrigatório",
+    "orderId": "orderId é obrigatório"
+  }
 }
 ```
 
@@ -260,17 +321,12 @@ curl http://localhost:8083/payments/order/12345
 
 ```json
 {
-  "error": "Payment not found for orderId: 99999"
+  "timestamp": "2026-03-20T12:00:00Z",
+  "status": 404,
+  "error": "Not Found",
+  "message": "Pagamento não encontrado para o orderId: 99999"
 }
 ```
-
-## Tratamento de erros
-
-O serviço possui tratamento global de exceções para:
-
-- `PaymentNotFoundException` → `404 Not Found`
-- `IllegalArgumentException` → `400 Bad Request`
-- `MethodArgumentNotValidException` → `400 Bad Request`
 
 ---
 
@@ -287,20 +343,22 @@ O serviço integra com um **processador externo de pagamentos** disponibilizado 
 
 ## Fluxo de integração
 
-1. o `payment-service` envia uma requisição de pagamento
+1. o `payment-service` envia uma requisição para o `procpag`
 2. o processador retorna `accepted`
 3. o serviço consulta o status do pagamento
-4. quando o status retorna `pago`, o pagamento é marcado como `APPROVED`
+4. quando o status retornado é `pago`, o pagamento é marcado como `APPROVED`
+5. quando há erro, indisponibilidade ou retorno não satisfatório, o pagamento segue como `PENDING`
 
 ## Observações importantes
 
-- o `payment-service` trabalha internamente com valores monetários em `BigDecimal`
-- a persistência do pagamento utiliza `numeric(19,2)`
-- o contrato HTTP do `procpag` exige que o campo `valor` seja enviado como **inteiro**
-- o DTO enviado ao `procpag` utiliza `valor` como inteiro
-- o processador pode apresentar **falhas intermitentes**
-- falhas ou indisponibilidades resultam em pagamentos **PENDING**
-- existe suporte a client fake controlado por configuração (`app.external-payment.fake-enabled`)
+* o `payment-service` trabalha internamente com valores monetários em `BigDecimal`
+* a persistência utiliza `numeric(19,2)`
+* o `procpag` exige o campo `valor` como **inteiro**
+* o valor enviado ao `procpag` é convertido para **centavos**
+* o processador pode apresentar **falhas intermitentes**
+* falhas resultam em pagamentos **PENDING**
+* existe suporte a client fake controlado por configuração (`app.external-payment.fake-enabled`)
+* a integração utiliza `RestClient` com `connect-timeout-ms` e `read-timeout-ms`
 
 ---
 
@@ -312,12 +370,12 @@ O `payment-service` adota duas representações de valor monetário, cada uma ad
 
 No domínio, nos casos de uso, nos eventos e na persistência, o valor do pagamento é tratado como **valor monetário decimal**, utilizando `BigDecimal`.
 
-Exemplos válidos no domínio:
+Exemplos válidos:
 
-- `10.00`
-- `10.50`
-- `89.90`
-- `120.00`
+* `10.00`
+* `10.50`
+* `89.90`
+* `120.00`
 
 A tabela `payments` persiste o campo `amount` como `numeric(19,2)`.
 
@@ -325,52 +383,38 @@ A tabela `payments` persiste o campo `amount` como `numeric(19,2)`.
 
 Na borda de integração HTTP com o `procpag`, o campo `valor` deve ser enviado como **inteiro**.
 
-Em validações manuais realizadas contra o processador externo:
-
-- payload com `valor: 100` foi aceito
-- payload com `valor: 100.50` foi rejeitado com `400 Bad Request`
-- payload com `valor: "100.50"` também foi rejeitado com `400 Bad Request`
-
-Isso indica que o `procpag` não aceita valor decimal no corpo da requisição.
+Para preservar a semântica monetária, a conversão adotada é para **centavos**.
 
 ## Convenção adotada
 
-Para compatibilizar o domínio monetário do `payment-service` com o contrato do `procpag`, o valor será tratado da seguinte forma:
-
-- no domínio: `BigDecimal` com até 2 casas decimais
-- na integração externa: conversão para **inteiro em centavos**
+* no domínio: `BigDecimal` com até 2 casas decimais
+* na integração externa: conversão para **inteiro em centavos**
 
 Exemplos:
 
-- `1.00` → `100`
-- `10.50` → `1050`
-- `89.90` → `8990`
-- `120.00` → `12000`
+* `1.00` → `100`
+* `10.50` → `1050`
+* `89.90` → `8990`
+* `120.00` → `12000`
 
 ## Regra de validação
 
-O serviço considera válidos apenas valores monetários com **até 2 casas decimais**.
+O serviço considera válidos apenas valores com **até 2 casas decimais**.
 
 Exemplos:
 
-- `10` → válido
-- `10.5` → válido
-- `10.50` → válido
-- `10.505` → inválido
+* `10` → válido
+* `10.5` → válido
+* `10.50` → válido
+* `10.505` → inválido
 
 ## Decisão arquitetural
 
-O projeto **não adota truncagem silenciosa** nem arredondamento implícito na integração de pagamento.
+O projeto **não adota truncagem silenciosa** nem arredondamento implícito.
 
-Motivos:
+A estratégia adotada é:
 
-- evitar alteração silenciosa de valor financeiro
-- preservar consistência entre pedido, pagamento e auditoria
-- manter o domínio monetário explícito e previsível
-
-Assim, a estratégia adotada é:
-
-1. aceitar valores monetários decimais no domínio
+1. aceitar valores decimais no domínio
 2. validar no máximo 2 casas decimais
 3. converter para inteiro em centavos somente na integração com o `procpag`
 
@@ -380,10 +424,12 @@ Assim, a estratégia adotada é:
 
 A integração com o processador externo utiliza **Resilience4j** com as seguintes estratégias:
 
-- **Retry**
-- **Circuit Breaker**
-- **Bulkhead**
-- **TimeLimiter**
+* **Retry**
+* **Circuit Breaker**
+* **Bulkhead**
+* **TimeLimiter**
+
+Além disso, a chamada pode ser executada em executor dedicado, permitindo controle de timeout sem acoplar a lógica de negócio ao cliente HTTP.
 
 ## Configuração base
 
@@ -426,10 +472,28 @@ O projeto possui suporte ao **reprocessamento de pagamentos pendentes** por meio
 
 1. o pagamento falha no processador externo
 2. o status permanece `PENDING`
-3. o mecanismo de retry busca pagamentos pendentes
+3. o mecanismo de retry busca pagamentos elegíveis
 4. o pagamento é reenviado ao processador externo
-5. quando aprovado, o status é atualizado para `APPROVED`
-6. um novo evento é publicado com o resultado
+5. se aprovado, o status passa para `APPROVED`
+6. se continuar falhando:
+
+  * permanece `PENDING` enquanto houver tentativas restantes
+  * passa para `FAILED` ao atingir o limite
+
+## Política de retry
+
+A política é controlada por:
+
+* `app.payment.retry.policy.max-attempts`
+* `app.payment.retry.policy.publish-pending-on-retry-failure`
+
+Comportamento padrão atual:
+
+* `max-attempts: 3`
+* `publish-pending-on-retry-failure: false`
+
+Isso significa que falhas intermediárias de retry **não geram novo evento `payment.pending`**.
+Quando o limite é atingido, o serviço registra `payment.failed` no outbox.
 
 ## Configuração
 
@@ -440,6 +504,9 @@ app:
       scheduler:
         enabled: true
         fixed-delay-ms: 30000
+      policy:
+        max-attempts: 3
+        publish-pending-on-retry-failure: false
 ```
 
 ---
@@ -489,6 +556,19 @@ app:
 }
 ```
 
+### `payment.failed`
+
+```json
+{
+  "paymentId": "550e8400-e29b-41d4-a716-446655440012",
+  "orderId": 12345,
+  "clientId": "550e8400-e29b-41d4-a716-446655440001",
+  "amount": 120.00,
+  "status": "FAILED",
+  "occurredAt": "2026-03-20T12:00:00Z"
+}
+```
+
 ---
 
 # 🧠 Regras de Negócio
@@ -496,30 +576,47 @@ app:
 Fluxo principal do pagamento:
 
 1. recebe evento `order.created`
-2. verifica se já existe pagamento para o pedido
-3. se já existir, reutiliza o pagamento existente
-4. se não existir:
-    - cria pagamento com status `PENDING`
-    - persiste o pagamento
-    - chama o processador externo
-5. se aprovado:
-    - atualiza status para `APPROVED`
-    - publica evento `payment.approved`
-6. caso ocorra erro, rejeição ou indisponibilidade:
-    - mantém pagamento `PENDING`
-    - publica evento `payment.pending`
+2. registra a mensagem por `messageId` para evitar reprocessamento
+3. verifica se já existe pagamento para o pedido
+4. se já existir, reutiliza o pagamento existente
+5. se não existir:
+
+  * cria o pagamento
+  * persiste o estado inicial
+  * chama o processador externo
+6. se aprovado:
+
+  * atualiza status para `APPROVED`
+  * registra `payment.approved` no outbox
+7. se houver erro ou indisponibilidade:
+
+  * mantém `PENDING`
+  * atualiza metadados de retry
+  * registra `payment.pending` no outbox
 
 ---
 
 ## Idempotência
 
-O serviço possui duas camadas principais de proteção contra duplicidade:
+O serviço possui múltiplas camadas de proteção contra duplicidade:
 
 ### 1. Idempotência por `orderId`
-A tabela `payments` possui restrição única em `order_id`, evitando mais de um pagamento para o mesmo pedido.
+
+A tabela `payments` possui restrição única em `order_id`, impedindo múltiplos pagamentos para o mesmo pedido.
 
 ### 2. Idempotência no consumo de eventos
+
 O evento consumido possui `messageId`, e o serviço registra mensagens processadas na tabela `processed_messages`, evitando reprocessamento do mesmo evento.
+
+### 3. Reaproveitamento em concorrência
+
+Em cenários concorrentes, o serviço reaproveita o pagamento persistido pelo fluxo vencedor.
+
+---
+
+## Falha definitiva
+
+Quando `retryCount + 1 >= max-attempts`, o pagamento é marcado como `FAILED`, deixa de possuir `nextRetryAt` e o serviço registra `payment.failed` no outbox.
 
 ---
 
@@ -527,10 +624,54 @@ O evento consumido possui `messageId`, e o serviço registra mensagens processad
 
 O valor do pagamento:
 
-- deve ser maior que zero
-- deve possuir no máximo 2 casas decimais
-- é mantido como valor monetário decimal no domínio
-- é convertido para inteiro em centavos apenas no momento da chamada ao `procpag`
+* deve ser maior que zero
+* deve possuir no máximo 2 casas decimais
+* é mantido como valor monetário decimal no domínio
+* é convertido para inteiro em centavos apenas no momento da chamada ao `procpag`
+
+### Exemplo numérico da conversão para centavos
+
+Suponha que um pedido tenha valor de **R$ 10,50**.
+
+No domínio do `payment-service`, esse valor é representado como:
+
+```text
+10.50
+```
+
+Como o `procpag` exige um inteiro no campo `valor`, o serviço converte esse valor para centavos antes de enviar a requisição:
+
+```text
+10.50 × 100 = 1050
+```
+
+Ou seja:
+
+* valor no domínio: `10.50`
+* valor enviado ao `procpag`: `1050`
+
+Outro exemplo:
+
+* valor no domínio: `89.90`
+* conversão: `89.90 × 100 = 8990`
+* valor enviado ao `procpag`: `8990`
+
+### Exemplo de fluxo
+
+1. a API recebe `amount = 10.50`
+2. o domínio persiste `amount = 10.50`
+3. ao montar o payload externo, o serviço converte para `valor = 1050`
+4. o `procpag` recebe o inteiro `1050`
+
+### Por que não enviar `10.50` diretamente?
+
+Porque o `procpag` não aceita valor decimal no campo `valor`.
+
+Assim, a conversão para centavos evita:
+
+* perda de precisão
+* arredondamento implícito
+* ambiguidade na integração
 
 ---
 
@@ -540,28 +681,34 @@ O serviço possui integração com **Micrometer** e **Spring Boot Actuator** par
 
 ## Métricas registradas
 
-| Métrica                           | Descrição |
-| --------------------------------- | --------- |
-| `payment.approved.total`          | total de pagamentos aprovados |
-| `payment.pending.total`           | total de pagamentos pendentes |
+| Métrica                           | Descrição                                  |
+| --------------------------------- | ------------------------------------------ |
+| `payment.approved.total`          | total de pagamentos aprovados              |
+| `payment.pending.total`           | total de pagamentos pendentes              |
+| `payment.failed.total`            | total de pagamentos falhados               |
 | `payment.idempotent.reused.total` | pagamentos reaproveitados por idempotência |
-| `payment.processing.duration`     | duração do processamento de pagamentos |
+| `payment.processing.duration`     | duração do processamento                   |
 
 ## Logs relevantes
 
 O serviço registra logs para:
 
-- início do processamento
-- reaproveitamento por idempotência
-- reaproveitamento por concorrência
-- início da chamada ao processador externo
-- aprovação
-- pendência
-- erro externo
+* início do processamento
+* reaproveitamento por idempotência
+* reaproveitamento por concorrência
+* chamada ao processador externo
+* aprovação
+* pendência
+* falha definitiva
+* erro externo
 
 ---
 
 # 🗄 Banco de Dados
+
+O schema é versionado com **Flyway**.
+
+Hibernate está configurado para **validação** do schema.
 
 ## Migration inicial
 
@@ -584,7 +731,7 @@ create unique index uk_payments_order_id on payments(order_id);
 create index idx_payments_client_id on payments(client_id);
 ```
 
-> O campo `amount` é persistido como valor monetário decimal com 2 casas.  
+> O campo `amount` é persistido como valor decimal com 2 casas.
 > A conversão para inteiro acontece apenas na integração com o processador externo.
 
 ## Migration de idempotência
@@ -605,9 +752,44 @@ create index idx_processed_messages_aggregate_key
     on processed_messages (aggregate_key);
 ```
 
-O schema é versionado com **Flyway**.
+## Migration de metadados de retry
 
-Hibernate está configurado para **validação** do schema.
+```text
+src/main/resources/db/migration/V3__add_retry_metadata_to_payments.sql
+```
+
+```sql
+alter table payments
+    add column retry_count integer not null default 0,
+    add column last_retry_at timestamptz null,
+    add column next_retry_at timestamptz null;
+
+create index idx_payments_status_next_retry_at
+    on payments (status, next_retry_at);
+```
+
+## Migration de outbox
+
+```text
+src/main/resources/db/migration/V4__create_payment_outbox.sql
+```
+
+```sql
+create table payment_outbox (
+  id uuid primary key,
+  aggregate_id uuid not null,
+  event_type varchar(50) not null,
+  exchange_name varchar(100) not null,
+  routing_key varchar(100) not null,
+  payload text not null,
+  status varchar(20) not null,
+  created_at timestamptz not null,
+  published_at timestamptz null
+);
+
+create index idx_payment_outbox_status_created_at
+    on payment_outbox (status, created_at);
+```
 
 ---
 
@@ -615,43 +797,48 @@ Hibernate está configurado para **validação** do schema.
 
 Durante os testes do serviço, já foram validados cenários como:
 
-- processamento de pagamento via API HTTP
-- busca de pagamento por `orderId`
-- validação de payload HTTP
-- tratamento de pagamento não encontrado
-- consumo do evento `order.created`
-- idempotência de mensagens consumidas por `messageId`
-- persistência do pagamento no PostgreSQL
-- idempotência por `orderId`
-- publicação do evento `payment.approved`
-- publicação do evento `payment.pending`
-- integração HTTP com o processador externo
-- retry do processador externo
-- circuit breaker
-- bulkhead
-- reprocessamento de pagamentos pendentes
+* processamento de pagamento via API HTTP
+* busca de pagamento por `orderId`
+* validação de payload HTTP
+* tratamento de pagamento não encontrado
+* consumo do evento `order.created`
+* idempotência por `messageId`
+* idempotência por `orderId`
+* reaproveitamento em concorrência
+* persistência do pagamento no PostgreSQL
+* publicação de `payment.approved`
+* publicação de `payment.pending`
+* publicação de `payment.failed`
+* integração HTTP com o processador externo
+* conversão monetária para centavos
+* retry do processador externo
+* circuit breaker
+* bulkhead
+* timeout com `TimeLimiter`
+* reprocessamento de pagamentos pendentes
+* publicação de eventos a partir do outbox
 
 ---
 
 # 🛠 Stack Tecnológica
 
-| Tecnologia                                 | Uso |
-| ------------------------------------------ | --- |
-| Java 21                                    | Linguagem |
-| Spring Boot 4.0.3                          | Framework principal |
-| Spring Web                                 | API HTTP |
-| Spring Data JPA                            | Persistência |
+| Tecnologia                                 | Uso                     |
+| ------------------------------------------ | ----------------------- |
+| Java 21                                    | Linguagem               |
+| Spring Boot 4.0.4                          | Framework principal     |
+| Spring Web                                 | API HTTP                |
+| Spring Data JPA                            | Persistência            |
 | Spring AMQP                                | Integração com RabbitMQ |
-| Spring Validation                          | Validação de requests |
-| Spring Boot Actuator                       | Observabilidade |
-| PostgreSQL                                 | Banco de dados |
+| Spring Validation                          | Validação de requests   |
+| Spring Boot Actuator                       | Observabilidade         |
+| PostgreSQL                                 | Banco de dados          |
 | Flyway                                     | Versionamento de schema |
-| RabbitMQ                                   | Mensageria |
-| Micrometer                                 | Métricas |
-| Spring Cloud CircuitBreaker + Resilience4j | Resiliência |
-| Docker / Docker Compose                    | Infraestrutura local |
-| Maven                                      | Build |
-| JUnit 5 / Mockito / Spring Boot Test       | Testes |
+| RabbitMQ                                   | Mensageria              |
+| Micrometer                                 | Métricas                |
+| Spring Cloud CircuitBreaker + Resilience4j | Resiliência             |
+| Docker / Docker Compose                    | Infraestrutura local    |
+| Maven                                      | Build                   |
+| JUnit 5 / Mockito / Spring Boot Test       | Testes                  |
 
 ---
 
@@ -684,10 +871,11 @@ infra
  │   └── outbound
  ├── observability
  │   └── adapter
- └── persistence
-     ├── adapter
-     ├── entity
-     └── repository
+ ├── persistence
+ │   ├── adapter
+ │   ├── entity
+ │   └── repository
+ └── scheduler
 ```
 
 ---
@@ -698,10 +886,10 @@ infra
 
 Antes de executar o projeto, garanta que você tenha instalado:
 
-- Java 21
-- Maven 3.9+
-- Docker
-- Docker Compose
+* Java 21
+* Maven 3.9+
+* Docker
+* Docker Compose
 
 ---
 
@@ -782,24 +970,62 @@ app:
     exchange:
       order: ex.order
       payment: ex.payment
+
     routing-key:
       order-created: order.created
       payment-approved: payment.approved
       payment-pending: payment.pending
+      payment-failed: payment.failed
+
     queue:
       payment-order-created: payment.order.created
+      payment-approved-debug: payment.approved.debug
+      payment-pending-debug: payment.pending.debug
+      payment-failed-debug: payment.failed.debug
+
+    dlq:
+      payment-order-created: payment.order.created.dlq
+      payment-approved-debug: payment.approved.debug.dlq
+      payment-pending-debug: payment.pending.debug.dlq
+      payment-failed-debug: payment.failed.debug.dlq
 
   payment:
     retry:
       scheduler:
         enabled: true
         fixed-delay-ms: 30000
+      policy:
+        max-attempts: 3
+        publish-pending-on-retry-failure: false
+
+    outbox:
+      publisher:
+        enabled: true
+        fixed-delay-ms: 5000
+        batch-size: 100
 
   external-payment:
     fake-enabled: false
     base-url: http://localhost:8089
     request-path: /requisicao
+    connect-timeout-ms: 1000
+    read-timeout-ms: 2000
+
+server:
+  port: 8083
 ```
+
+---
+
+# 🧪 Perfil de Teste
+
+No profile `test`, o projeto desabilita comportamentos agendados para manter a suíte determinística:
+
+* `app.external-payment.fake-enabled: true`
+* `app.payment.retry.scheduler.enabled: false`
+* `app.payment.outbox.publisher.enabled: false`
+
+Isso evita dependência do processador real e impede interferência dos schedulers durante a execução dos testes.
 
 ---
 
@@ -825,24 +1051,6 @@ mvn -Dtest=PaymentControllerTest test
 
 ---
 
-# 🔄 Integração Contínua
-
-Pipeline localizado em:
-
-```text
-.github/workflows/ci.yml
-```
-
-Etapas do pipeline:
-
-- setup do Java 21
-- subida dos serviços necessários
-- execução das migrations
-- execução da suíte de testes
-- validação do build
-
----
-
 # 🧭 Architecture Decision Records
 
 ## ADR-001 — Clean Architecture
@@ -850,9 +1058,10 @@ Etapas do pipeline:
 O serviço segue **Clean Architecture** para separar domínio, casos de uso e infraestrutura.
 
 ### Benefícios
-- baixo acoplamento
-- alta testabilidade
-- facilidade de evolução
+
+* baixo acoplamento
+* alta testabilidade
+* facilidade de evolução
 
 ---
 
@@ -860,18 +1069,19 @@ O serviço segue **Clean Architecture** para separar domínio, casos de uso e in
 
 A comunicação entre microsserviços utiliza **RabbitMQ** para garantir:
 
-- desacoplamento
-- resiliência
-- escalabilidade
+* desacoplamento
+* resiliência
+* escalabilidade
 
 ---
 
 ## ADR-003 — Idempotência
 
-O serviço adota idempotência em dois níveis:
+O serviço adota idempotência em múltiplos níveis:
 
-- por `orderId`, evitando múltiplos pagamentos para o mesmo pedido
-- por `messageId`, evitando reprocessamento do mesmo evento consumido
+* por `orderId`, evitando múltiplos pagamentos para o mesmo pedido
+* por `messageId`, evitando reprocessamento do mesmo evento consumido
+* por reaproveitamento do registro persistido em cenário concorrente
 
 ---
 
@@ -879,10 +1089,10 @@ O serviço adota idempotência em dois níveis:
 
 A comunicação com o processador externo utiliza mecanismos de resiliência para reduzir impacto de falhas transitórias e indisponibilidade parcial:
 
-- retry
-- circuit breaker
-- bulkhead
-- time limiter
+* retry
+* circuit breaker
+* bulkhead
+* time limiter
 
 ---
 
@@ -894,14 +1104,36 @@ Entretanto, o processador externo `procpag` exige o campo `valor` como inteiro n
 
 Diante disso, foi adotada a seguinte decisão:
 
-- manter `BigDecimal` no domínio, eventos e persistência
-- validar valores com no máximo 2 casas decimais
-- converter o valor para inteiro em centavos apenas na borda de integração com o `procpag`
-- não aplicar truncagem silenciosa nem arredondamento implícito
+* manter `BigDecimal` no domínio, eventos e persistência
+* validar valores com no máximo 2 casas decimais
+* converter o valor para inteiro em centavos apenas na borda de integração com o `procpag`
+* não aplicar truncagem silenciosa nem arredondamento implícito
 
 ### Benefícios
 
-- preserva a modelagem monetária correta no domínio
-- evita perda silenciosa de valor
-- reduz inconsistências entre pedido, pagamento e auditoria
-- mantém a adaptação técnica isolada na camada de infraestrutura
+* preserva a modelagem monetária correta no domínio
+* evita perda silenciosa de valor
+* reduz inconsistências entre pedido, pagamento e auditoria
+* mantém a adaptação técnica isolada na camada de infraestrutura
+
+---
+
+## ADR-006 — Publicação de Eventos via Outbox
+
+A publicação de eventos de pagamento não ocorre diretamente no momento da decisão de negócio.
+
+Em vez disso:
+
+* o pagamento é persistido
+* o evento correspondente é registrado em `payment_outbox`
+* um publisher dedicado busca eventos pendentes e os envia ao RabbitMQ
+* após envio com sucesso, o evento é marcado como `PUBLISHED`
+
+### Benefícios
+
+* maior confiabilidade na integração assíncrona
+* melhor rastreabilidade
+* menor acoplamento entre domínio, persistência e broker
+* base sólida para evolução operacional futura
+
+
