@@ -18,24 +18,30 @@ public class RetryPendingPaymentsUseCase {
     private final PaymentEventPublisherGateway paymentEventPublisherGateway;
     private final PaymentObservabilityGateway paymentObservabilityGateway;
     private final Duration retryBackoff;
+    private final int maxRetryCount;
+    private final boolean publishPendingOnRetryFailure;
 
     public RetryPendingPaymentsUseCase(
             PaymentRepositoryGateway paymentRepositoryGateway,
             ExternalPaymentProcessorGateway externalPaymentProcessorGateway,
             PaymentEventPublisherGateway paymentEventPublisherGateway,
             PaymentObservabilityGateway paymentObservabilityGateway,
-            Duration retryBackoff
+            Duration retryBackoff,
+            int maxRetryCount,
+            boolean publishPendingOnRetryFailure
     ) {
         this.paymentRepositoryGateway = paymentRepositoryGateway;
         this.externalPaymentProcessorGateway = externalPaymentProcessorGateway;
         this.paymentEventPublisherGateway = paymentEventPublisherGateway;
         this.paymentObservabilityGateway = paymentObservabilityGateway;
         this.retryBackoff = Objects.requireNonNull(retryBackoff, "retryBackoff é obrigatório");
+        this.maxRetryCount = maxRetryCount;
+        this.publishPendingOnRetryFailure = publishPendingOnRetryFailure;
     }
 
     public void execute() {
         List<Payment> pendingPayments =
-                paymentRepositoryGateway.findRetryablePendingPayments(OffsetDateTime.now());
+                paymentRepositoryGateway.findRetryablePendingPayments(OffsetDateTime.now(), maxRetryCount);
 
         for (Payment payment : pendingPayments) {
             retry(payment);
@@ -60,16 +66,20 @@ public class RetryPendingPaymentsUseCase {
                 return;
             }
 
-            payment.registerRetryFailure(retryBackoff);
-            Payment savedPayment = paymentRepositoryGateway.save(payment);
-            paymentObservabilityGateway.logPending(savedPayment);
-            paymentEventPublisherGateway.publishPending(savedPayment);
+            handleRetryFailure(payment);
 
         } catch (Exception exception) {
             paymentObservabilityGateway.logExternalError(payment, exception);
-            payment.registerRetryFailure(retryBackoff);
-            Payment savedPayment = paymentRepositoryGateway.save(payment);
-            paymentObservabilityGateway.logPending(savedPayment);
+            handleRetryFailure(payment);
+        }
+    }
+
+    private void handleRetryFailure(Payment payment) {
+        payment.registerRetryFailure(retryBackoff);
+        Payment savedPayment = paymentRepositoryGateway.save(payment);
+        paymentObservabilityGateway.logPending(savedPayment);
+
+        if (publishPendingOnRetryFailure) {
             paymentEventPublisherGateway.publishPending(savedPayment);
         }
     }

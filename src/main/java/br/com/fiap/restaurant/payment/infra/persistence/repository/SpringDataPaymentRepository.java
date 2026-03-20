@@ -20,7 +20,11 @@ public interface SpringDataPaymentRepository extends JpaRepository<PaymentEntity
             select p
             from PaymentEntity p
             where p.status = 'PENDING'
+              and p.retryCount < :maxRetryCount
               and (p.nextRetryAt is null or p.nextRetryAt <= :referenceTime)
             """)
-    List<PaymentEntity> findRetryablePendingPayments(@Param("referenceTime") OffsetDateTime referenceTime);
+    List<PaymentEntity> findRetryablePendingPayments(
+            @Param("referenceTime") OffsetDateTime referenceTime,
+            @Param("maxRetryCount") int maxRetryCount
+    );
 }

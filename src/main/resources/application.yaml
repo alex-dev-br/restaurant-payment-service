@@ -77,6 +77,9 @@ app:
       scheduler:
         enabled: true
         fixed-delay-ms: 30000
+      policy:
+        max-attempts: 3
+        publish-pending-on-retry-failure: false
 
   external-payment:
     fake-enabled: ${APP_EXTERNAL_PAYMENT_FAKE_ENABLED:false}

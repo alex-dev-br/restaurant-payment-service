@@ -14,5 +14,5 @@ public interface PaymentRepositoryGateway {
     Optional<Payment> findById(UUID id);
     Optional<Payment> findByOrderId(Long orderId);
     List<Payment> findByStatus(PaymentStatus status);
-    List<Payment> findRetryablePendingPayments(OffsetDateTime referenceTime);
+    List<Payment> findRetryablePendingPayments(OffsetDateTime referenceTime, int maxRetryCount);
 }

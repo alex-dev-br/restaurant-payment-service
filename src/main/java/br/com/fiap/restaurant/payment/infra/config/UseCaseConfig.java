@@ -56,14 +56,17 @@ public class UseCaseConfig {
             ExternalPaymentProcessorGateway externalPaymentProcessorGateway,
             PaymentEventPublisherGateway paymentEventPublisherGateway,
             PaymentObservabilityGateway paymentObservabilityGateway,
-            PaymentRetrySchedulerProperties paymentRetrySchedulerProperties
+            PaymentRetrySchedulerProperties paymentRetrySchedulerProperties,
+            PaymentRetryPolicyProperties paymentRetryPolicyProperties
     ) {
         return new RetryPendingPaymentsUseCase(
                 paymentRepositoryGateway,
                 externalPaymentProcessorGateway,
                 paymentEventPublisherGateway,
                 paymentObservabilityGateway,
-                Duration.ofMillis(paymentRetrySchedulerProperties.getFixedDelayMs())
+                Duration.ofMillis(paymentRetrySchedulerProperties.getFixedDelayMs()),
+                paymentRetryPolicyProperties.getMaxAttempts(),
+                paymentRetryPolicyProperties.isPublishPendingOnRetryFailure()
         );
     }
 }

@@ -67,8 +67,8 @@ public class PaymentRepositoryAdapter implements PaymentRepositoryGateway {
     }
 
     @Override
-    public List<Payment> findRetryablePendingPayments(OffsetDateTime referenceTime) {
-        return repository.findRetryablePendingPayments(referenceTime)
+    public List<Payment> findRetryablePendingPayments(OffsetDateTime referenceTime, int maxRetryCount) {
+        return repository.findRetryablePendingPayments(referenceTime, maxRetryCount)
                 .stream()
                 .map(mapper::toDomain)
                 .toList();
