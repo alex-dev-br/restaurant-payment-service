@@ -49,10 +49,7 @@ class ProcessPaymentUseCaseIntegrationTest {
     @BeforeEach
     void setUp() {
         springDataPaymentRepository.deleteAll();
-        reset(
-                externalPaymentProcessorGateway,
-                paymentEventPublisherGateway
-        );
+        reset(externalPaymentProcessorGateway, paymentEventPublisherGateway);
     }
 
     @Test
@@ -69,12 +66,18 @@ class ProcessPaymentUseCaseIntegrationTest {
 
         assertNotNull(result);
         assertEquals(PaymentStatus.APPROVED, result.getStatus());
+        assertEquals(0, result.getRetryCount());
+        assertNull(result.getLastRetryAt());
+        assertNull(result.getNextRetryAt());
 
         var savedEntity = springDataPaymentRepository.findByOrderId(orderId);
         assertTrue(savedEntity.isPresent());
         assertEquals(PaymentStatus.APPROVED.name(), savedEntity.get().getStatus());
         assertEquals(new BigDecimal("120.00"), savedEntity.get().getAmount());
         assertEquals(clientId, savedEntity.get().getClientId());
+        assertEquals(0, savedEntity.get().getRetryCount());
+        assertNull(savedEntity.get().getLastRetryAt());
+        assertNull(savedEntity.get().getNextRetryAt());
 
         assertEquals(1, springDataPaymentRepository.findAll().size());
 
@@ -87,7 +90,7 @@ class ProcessPaymentUseCaseIntegrationTest {
     }
 
     @Test
-    void shouldPersistPendingPaymentWhenExternalProcessorReturnsFalse() {
+    void shouldPersistPendingPaymentWithInitialRetryMetadataWhenExternalProcessorReturnsFalse() {
         Long orderId = 2L;
         UUID clientId = UUID.randomUUID();
         BigDecimal amount = new BigDecimal("55.90");
@@ -100,12 +103,18 @@ class ProcessPaymentUseCaseIntegrationTest {
 
         assertNotNull(result);
         assertEquals(PaymentStatus.PENDING, result.getStatus());
+        assertEquals(1, result.getRetryCount());
+        assertNotNull(result.getLastRetryAt());
+        assertNotNull(result.getNextRetryAt());
 
         var savedEntity = springDataPaymentRepository.findByOrderId(orderId);
         assertTrue(savedEntity.isPresent());
         assertEquals(PaymentStatus.PENDING.name(), savedEntity.get().getStatus());
         assertEquals(new BigDecimal("55.90"), savedEntity.get().getAmount());
         assertEquals(clientId, savedEntity.get().getClientId());
+        assertEquals(1, savedEntity.get().getRetryCount());
+        assertNotNull(savedEntity.get().getLastRetryAt());
+        assertNotNull(savedEntity.get().getNextRetryAt());
 
         assertEquals(1, springDataPaymentRepository.findAll().size());
 
@@ -118,7 +127,7 @@ class ProcessPaymentUseCaseIntegrationTest {
     }
 
     @Test
-    void shouldPersistPendingPaymentWhenExternalProcessorThrowsException() {
+    void shouldPersistPendingPaymentWithInitialRetryMetadataWhenExternalProcessorThrowsException() {
         Long orderId = 3L;
         UUID clientId = UUID.randomUUID();
         BigDecimal amount = new BigDecimal("77.50");
@@ -131,12 +140,18 @@ class ProcessPaymentUseCaseIntegrationTest {
 
         assertNotNull(result);
         assertEquals(PaymentStatus.PENDING, result.getStatus());
+        assertEquals(1, result.getRetryCount());
+        assertNotNull(result.getLastRetryAt());
+        assertNotNull(result.getNextRetryAt());
 
         var savedEntity = springDataPaymentRepository.findByOrderId(orderId);
         assertTrue(savedEntity.isPresent());
         assertEquals(PaymentStatus.PENDING.name(), savedEntity.get().getStatus());
         assertEquals(new BigDecimal("77.50"), savedEntity.get().getAmount());
         assertEquals(clientId, savedEntity.get().getClientId());
+        assertEquals(1, savedEntity.get().getRetryCount());
+        assertNotNull(savedEntity.get().getLastRetryAt());
+        assertNotNull(savedEntity.get().getNextRetryAt());
 
         assertEquals(1, springDataPaymentRepository.findAll().size());
 

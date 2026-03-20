@@ -1,11 +1,14 @@
 package br.com.fiap.restaurant.payment.core.usecase;
 
 import br.com.fiap.restaurant.payment.core.domain.model.Payment;
-import br.com.fiap.restaurant.payment.core.usecase.command.ProcessPaymentCommand;
 import br.com.fiap.restaurant.payment.core.gateway.ExternalPaymentProcessorGateway;
 import br.com.fiap.restaurant.payment.core.gateway.PaymentEventPublisherGateway;
 import br.com.fiap.restaurant.payment.core.gateway.PaymentObservabilityGateway;
 import br.com.fiap.restaurant.payment.core.gateway.PaymentRepositoryGateway;
+import br.com.fiap.restaurant.payment.core.usecase.command.ProcessPaymentCommand;
+
+import java.time.Duration;
+import java.util.Objects;
 
 public class ProcessPaymentUseCase {
 
@@ -13,17 +16,20 @@ public class ProcessPaymentUseCase {
     private final ExternalPaymentProcessorGateway externalPaymentProcessorGateway;
     private final PaymentEventPublisherGateway paymentEventPublisherGateway;
     private final PaymentObservabilityGateway paymentObservabilityGateway;
+    private final Duration retryBackoff;
 
     public ProcessPaymentUseCase(
             PaymentRepositoryGateway paymentRepositoryGateway,
             ExternalPaymentProcessorGateway externalPaymentProcessorGateway,
             PaymentEventPublisherGateway paymentEventPublisherGateway,
-            PaymentObservabilityGateway paymentObservabilityGateway
+            PaymentObservabilityGateway paymentObservabilityGateway,
+            Duration retryBackoff
     ) {
         this.paymentRepositoryGateway = paymentRepositoryGateway;
         this.externalPaymentProcessorGateway = externalPaymentProcessorGateway;
         this.paymentEventPublisherGateway = paymentEventPublisherGateway;
         this.paymentObservabilityGateway = paymentObservabilityGateway;
+        this.retryBackoff = Objects.requireNonNull(retryBackoff, "retryBackoff é obrigatório");
     }
 
     public Payment execute(ProcessPaymentCommand command) {
@@ -81,12 +87,12 @@ public class ProcessPaymentUseCase {
                 return persistAndPublishApproved(payment);
             }
 
-            payment.markAsPending();
+            payment.registerRetryFailure(retryBackoff);
             return persistAndPublishPending(payment);
 
         } catch (Exception exception) {
-            payment.markAsPending();
             paymentObservabilityGateway.logExternalError(payment, exception);
+            payment.registerRetryFailure(retryBackoff);
             return persistAndPublishPending(payment);
         }
     }

@@ -8,6 +8,8 @@ import br.com.fiap.restaurant.payment.infra.observability.adapter.NoOpPaymentObs
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 
+import java.time.Duration;
+
 @TestConfiguration
 public class ProcessPaymentUseCaseITConfig {
 
@@ -22,7 +24,8 @@ public class ProcessPaymentUseCaseITConfig {
                 paymentRepositoryGateway,
                 externalPaymentProcessorGateway,
                 paymentEventPublisherGateway,
-                paymentObservabilityGateway
+                paymentObservabilityGateway,
+                Duration.ofSeconds(30)
         );
     }
 

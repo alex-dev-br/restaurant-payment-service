@@ -22,13 +22,15 @@ public class UseCaseConfig {
             PaymentRepositoryGateway paymentRepositoryGateway,
             ExternalPaymentProcessorGateway externalPaymentProcessorGateway,
             PaymentEventPublisherGateway paymentEventPublisherGateway,
-            PaymentObservabilityGateway paymentObservabilityGateway
+            PaymentObservabilityGateway paymentObservabilityGateway,
+            PaymentRetrySchedulerProperties paymentRetrySchedulerProperties
     ) {
         return new ProcessPaymentUseCase(
                 paymentRepositoryGateway,
                 externalPaymentProcessorGateway,
                 paymentEventPublisherGateway,
-                paymentObservabilityGateway
+                paymentObservabilityGateway,
+                Duration.ofMillis(paymentRetrySchedulerProperties.getFixedDelayMs())
         );
     }
 
