@@ -4,7 +4,9 @@ import br.com.fiap.restaurant.payment.core.gateway.ExternalPaymentProcessorGatew
 import br.com.fiap.restaurant.payment.core.gateway.PaymentEventPublisherGateway;
 import br.com.fiap.restaurant.payment.core.gateway.PaymentObservabilityGateway;
 import br.com.fiap.restaurant.payment.core.gateway.PaymentRepositoryGateway;
+import br.com.fiap.restaurant.payment.core.gateway.ProcessedMessageRepositoryGateway;
 import br.com.fiap.restaurant.payment.core.usecase.FindPaymentByOrderIdUseCase;
+import br.com.fiap.restaurant.payment.core.usecase.HandleOrderCreatedEventUseCase;
 import br.com.fiap.restaurant.payment.core.usecase.ProcessPaymentUseCase;
 import br.com.fiap.restaurant.payment.core.usecase.RetryPendingPaymentsUseCase;
 import org.springframework.context.annotation.Bean;
@@ -25,6 +27,17 @@ public class UseCaseConfig {
                 externalPaymentProcessorGateway,
                 paymentEventPublisherGateway,
                 paymentObservabilityGateway
+        );
+    }
+
+    @Bean
+    public HandleOrderCreatedEventUseCase handleOrderCreatedEventUseCase(
+            ProcessPaymentUseCase processPaymentUseCase,
+            ProcessedMessageRepositoryGateway processedMessageRepositoryGateway
+    ) {
+        return new HandleOrderCreatedEventUseCase(
+                processPaymentUseCase,
+                processedMessageRepositoryGateway
         );
     }
 

@@ -1,7 +1,7 @@
 package br.com.fiap.restaurant.payment.infra.messaging.inbound.consumer;
 
-import br.com.fiap.restaurant.payment.core.usecase.ProcessPaymentUseCase;
-import br.com.fiap.restaurant.payment.core.usecase.command.ProcessPaymentCommand;
+import br.com.fiap.restaurant.payment.core.usecase.HandleOrderCreatedEventUseCase;
+import br.com.fiap.restaurant.payment.core.usecase.command.HandleOrderCreatedEventCommand;
 import br.com.fiap.restaurant.payment.infra.messaging.config.RabbitProperties;
 import br.com.fiap.restaurant.payment.infra.messaging.inbound.dto.OrderCreatedMessage;
 import org.junit.jupiter.api.BeforeEach;
@@ -39,7 +39,7 @@ class OrderCreatedConsumerIntegrationTest {
     private AmqpAdmin amqpAdmin;
 
     @MockitoBean
-    private ProcessPaymentUseCase processPaymentUseCase;
+    private HandleOrderCreatedEventUseCase handleOrderCreatedEventUseCase;
 
     @BeforeEach
     void setUp() {
@@ -52,12 +52,18 @@ class OrderCreatedConsumerIntegrationTest {
     }
 
     @Test
-    void shouldConsumeOrderCreatedMessageAndInvokeProcessPaymentUseCase() {
+    void shouldConsumeOrderCreatedMessageAndInvokeHandleOrderCreatedEventUseCase() {
+        UUID messageId = UUID.randomUUID();
         Long orderId = 1L;
         UUID clientId = UUID.randomUUID();
         BigDecimal amount = new BigDecimal("120.00");
 
-        OrderCreatedMessage message = new OrderCreatedMessage(orderId, clientId, amount);
+        OrderCreatedMessage message = new OrderCreatedMessage(
+                messageId,
+                orderId,
+                clientId,
+                amount
+        );
 
         rabbitTemplate.convertAndSend(
                 rabbitProperties.getExchange().getOrder(),
@@ -65,13 +71,14 @@ class OrderCreatedConsumerIntegrationTest {
                 message
         );
 
-        ArgumentCaptor<ProcessPaymentCommand> commandCaptor =
-                ArgumentCaptor.forClass(ProcessPaymentCommand.class);
+        ArgumentCaptor<HandleOrderCreatedEventCommand> commandCaptor =
+                ArgumentCaptor.forClass(HandleOrderCreatedEventCommand.class);
 
-        verify(processPaymentUseCase, timeout(5000)).execute(commandCaptor.capture());
+        verify(handleOrderCreatedEventUseCase, timeout(5000)).execute(commandCaptor.capture());
 
-        ProcessPaymentCommand capturedCommand = commandCaptor.getValue();
+        HandleOrderCreatedEventCommand capturedCommand = commandCaptor.getValue();
 
+        assertEquals(messageId, capturedCommand.messageId());
         assertEquals(orderId, capturedCommand.orderId());
         assertEquals(clientId, capturedCommand.clientId());
         assertEquals(amount, capturedCommand.amount());
