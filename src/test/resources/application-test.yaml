@@ -1,3 +1,23 @@
+spring:
+    devtools:
+        restart:
+            enabled: false
+
+    main:
+        log-startup-info: false
+
+    jpa:
+        show-sql: false
+
+logging:
+    level:
+        org.hibernate.SQL: WARN
+        org.hibernate.orm.jdbc.bind: WARN
+        org.springframework.test.context.support.AnnotationConfigContextLoaderUtils: WARN
+        org.springframework.boot.test.context.SpringBootTestContextBootstrapper: WARN
+        org.springframework.boot.devtools.restart.RestartApplicationListener: WARN
+        io.micrometer.core.instrument.MeterRegistry: ERROR
+
 app:
     external-payment:
         fake-enabled: true
