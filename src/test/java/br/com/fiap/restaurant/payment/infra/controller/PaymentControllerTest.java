@@ -1,5 +1,6 @@
 package br.com.fiap.restaurant.payment.infra.controller;
 
+import br.com.fiap.restaurant.payment.core.domain.exception.PaymentNotFoundException;
 import br.com.fiap.restaurant.payment.core.domain.model.Payment;
 import br.com.fiap.restaurant.payment.core.domain.model.PaymentStatus;
 import br.com.fiap.restaurant.payment.core.usecase.FindPaymentByOrderIdUseCase;
@@ -158,9 +159,7 @@ class PaymentControllerTest {
         Long orderId = 999L;
 
         when(findPaymentByOrderIdUseCase.execute(orderId))
-                .thenThrow(new IllegalArgumentException(
-                        "Pagamento não encontrado para o orderId: " + orderId
-                ));
+                .thenThrow(new PaymentNotFoundException(orderId));
 
         mockMvc.perform(get("/payments/order/{orderId}", orderId))
                 .andExpect(status().isNotFound())
