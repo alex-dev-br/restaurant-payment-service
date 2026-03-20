@@ -1,7 +1,7 @@
 package br.com.fiap.restaurant.payment.infra.observability.adapter;
 
-import br.com.fiap.restaurant.payment.core.gateway.PaymentObservabilityGateway;
 import br.com.fiap.restaurant.payment.core.domain.model.Payment;
+import br.com.fiap.restaurant.payment.core.gateway.PaymentObservabilityGateway;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
@@ -20,6 +20,7 @@ public class PaymentObservabilityAdapter implements PaymentObservabilityGateway 
 
     private final Counter approvedPaymentsCounter;
     private final Counter pendingPaymentsCounter;
+    private final Counter failedPaymentsCounter;
     private final Counter idempotentReuseCounter;
     private final Timer paymentProcessingTimer;
 
@@ -30,6 +31,10 @@ public class PaymentObservabilityAdapter implements PaymentObservabilityGateway 
 
         this.pendingPaymentsCounter = Counter.builder("payment.pending.total")
                 .description("Total de pagamentos pendentes")
+                .register(meterRegistry);
+
+        this.failedPaymentsCounter = Counter.builder("payment.failed.total")
+                .description("Total de pagamentos falhados")
                 .register(meterRegistry);
 
         this.idempotentReuseCounter = Counter.builder("payment.idempotent.reused.total")
@@ -82,8 +87,14 @@ public class PaymentObservabilityAdapter implements PaymentObservabilityGateway 
     }
 
     @Override
+    public void logFailed(Payment payment) {
+        failedPaymentsCounter.increment();
+        log.error("Pagamento marcado como falhado. orderId={}, paymentId={}, status={}, retryCount={}",
+                payment.getOrderId(), payment.getId(), payment.getStatus(), payment.getRetryCount());
+    }
+
+    @Override
     public void logExternalError(Payment payment, Exception exception) {
-        pendingPaymentsCounter.increment();
         log.error("Erro ao processar pagamento externamente. orderId={}, paymentId={}, motivo={}",
                 payment.getOrderId(), payment.getId(), exception.getMessage(), exception);
     }

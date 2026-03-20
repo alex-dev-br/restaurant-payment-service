@@ -75,6 +75,14 @@ public class RetryPendingPaymentsUseCase {
     }
 
     private void handleRetryFailure(Payment payment) {
+        if (payment.getRetryCount() + 1 >= maxRetryCount) {
+            payment.fail();
+            Payment savedPayment = paymentRepositoryGateway.save(payment);
+            paymentObservabilityGateway.logFailed(savedPayment);
+            paymentEventPublisherGateway.publishFailed(savedPayment);
+            return;
+        }
+
         payment.registerRetryFailure(retryBackoff);
         Payment savedPayment = paymentRepositoryGateway.save(payment);
         paymentObservabilityGateway.logPending(savedPayment);

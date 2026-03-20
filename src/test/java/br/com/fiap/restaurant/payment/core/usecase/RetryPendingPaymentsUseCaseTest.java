@@ -182,4 +182,46 @@ class RetryPendingPaymentsUseCaseTest {
                 OffsetDateTime.now()
         );
     }
+
+    @Test
+    void shouldMarkPaymentAsFailedWhenMaxAttemptsAreExhausted() {
+        Payment pendingPayment = new Payment(
+                UUID.randomUUID(),
+                100L,
+                UUID.randomUUID(),
+                new BigDecimal("150.00"),
+                PaymentStatus.PENDING,
+                OffsetDateTime.now(),
+                OffsetDateTime.now(),
+                2,
+                OffsetDateTime.now().minusSeconds(30),
+                OffsetDateTime.now().minusSeconds(1)
+        );
+
+        when(paymentRepositoryGateway.findRetryablePendingPayments(any(OffsetDateTime.class), eq(3)))
+                .thenReturn(List.of(pendingPayment));
+
+        when(externalPaymentProcessorGateway.process(
+                pendingPayment.getId(),
+                pendingPayment.getClientId(),
+                pendingPayment.getAmount()
+        )).thenReturn(false);
+
+        when(paymentRepositoryGateway.save(any(Payment.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        retryPendingPaymentsUseCase.execute();
+
+        verify(paymentRepositoryGateway).save(argThat(payment ->
+                payment.getStatus() == PaymentStatus.FAILED
+                        && payment.getRetryCount() == 3
+                        && payment.getNextRetryAt() == null
+        ));
+
+        verify(paymentEventPublisherGateway).publishFailed(any(Payment.class));
+        verify(paymentEventPublisherGateway, never()).publishPending(any(Payment.class));
+        verify(paymentEventPublisherGateway, never()).publishApproved(any(Payment.class));
+        verify(paymentObservabilityGateway).logFailed(any(Payment.class));
+    }
+
 }

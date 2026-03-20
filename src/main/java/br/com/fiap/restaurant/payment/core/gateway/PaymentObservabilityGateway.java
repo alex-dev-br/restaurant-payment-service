@@ -20,6 +20,8 @@ public interface PaymentObservabilityGateway {
 
     void logPending(Payment payment);
 
+    void logFailed(Payment payment);
+
     void logExternalError(Payment payment, Exception exception);
 
     <T> T measureProcessing(Supplier<T> supplier);

@@ -67,6 +67,7 @@ public class RabbitProperties {
         private String orderCreated;
         private String paymentApproved;
         private String paymentPending;
+        private String paymentFailed;
 
         public String getOrderCreated() {
             return orderCreated;
@@ -91,12 +92,21 @@ public class RabbitProperties {
         public void setPaymentPending(String paymentPending) {
             this.paymentPending = paymentPending;
         }
+
+        public String getPaymentFailed() {
+            return paymentFailed;
+        }
+
+        public void setPaymentFailed(String paymentFailed) {
+            this.paymentFailed = paymentFailed;
+        }
     }
 
     public static class QueueConfig {
         private String paymentOrderCreated;
         private String paymentApprovedDebug;
         private String paymentPendingDebug;
+        private String paymentFailedDebug;
 
         public String getPaymentOrderCreated() {
             return paymentOrderCreated;
@@ -120,6 +130,14 @@ public class RabbitProperties {
 
         public void setPaymentPendingDebug(String paymentPendingDebug) {
             this.paymentPendingDebug = paymentPendingDebug;
+        }
+
+        public String getPaymentFailedDebug() {
+            return paymentFailedDebug;
+        }
+
+        public void setPaymentFailedDebug(String paymentFailedDebug) {
+            this.paymentFailedDebug = paymentFailedDebug;
         }
     }
 
@@ -127,6 +145,7 @@ public class RabbitProperties {
         private String paymentOrderCreated;
         private String paymentApprovedDebug;
         private String paymentPendingDebug;
+        private String paymentFailedDebug;
 
         public String getPaymentOrderCreated() {
             return paymentOrderCreated;
@@ -150,6 +169,14 @@ public class RabbitProperties {
 
         public void setPaymentPendingDebug(String paymentPendingDebug) {
             this.paymentPendingDebug = paymentPendingDebug;
+        }
+
+        public String getPaymentFailedDebug() {
+            return paymentFailedDebug;
+        }
+
+        public void setPaymentFailedDebug(String paymentFailedDebug) {
+            this.paymentFailedDebug = paymentFailedDebug;
         }
     }
 }

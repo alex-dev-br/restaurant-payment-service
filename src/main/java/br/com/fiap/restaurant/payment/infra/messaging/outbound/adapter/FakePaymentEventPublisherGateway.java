@@ -1,7 +1,7 @@
 package br.com.fiap.restaurant.payment.infra.messaging.outbound.adapter;
 
-import br.com.fiap.restaurant.payment.core.gateway.PaymentEventPublisherGateway;
 import br.com.fiap.restaurant.payment.core.domain.model.Payment;
+import br.com.fiap.restaurant.payment.core.gateway.PaymentEventPublisherGateway;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
@@ -17,5 +17,10 @@ public class FakePaymentEventPublisherGateway implements PaymentEventPublisherGa
     @Override
     public void publishPending(Payment payment) {
         System.out.println("Evento fake: pagamento pendente - " + payment.getId());
+    }
+
+    @Override
+    public void publishFailed(Payment payment) {
+        System.out.println("Evento fake: pagamento falhado - " + payment.getId());
     }
 }

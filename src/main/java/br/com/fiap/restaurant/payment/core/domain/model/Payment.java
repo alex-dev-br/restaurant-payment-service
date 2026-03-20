@@ -118,6 +118,20 @@ public class Payment {
         this.nextRetryAt = now.plus(backoff);
     }
 
+    public void fail() {
+        OffsetDateTime now = OffsetDateTime.now();
+
+        this.status = PaymentStatus.FAILED;
+        this.updatedAt = now;
+        this.retryCount = this.retryCount + 1;
+        this.lastRetryAt = now;
+        this.nextRetryAt = null;
+    }
+
+    public boolean isFailed() {
+        return PaymentStatus.FAILED.equals(this.status);
+    }
+
     private void clearRetryMetadata() {
         this.retryCount = 0;
         this.lastRetryAt = null;

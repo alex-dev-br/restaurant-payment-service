@@ -1,7 +1,7 @@
 package br.com.fiap.restaurant.payment.infra.observability.adapter;
 
-import br.com.fiap.restaurant.payment.core.gateway.PaymentObservabilityGateway;
 import br.com.fiap.restaurant.payment.core.domain.model.Payment;
+import br.com.fiap.restaurant.payment.core.gateway.PaymentObservabilityGateway;
 
 import java.math.BigDecimal;
 import java.util.UUID;
@@ -26,6 +26,9 @@ public class NoOpPaymentObservabilityAdapter implements PaymentObservabilityGate
 
     @Override
     public void logPending(Payment payment) {}
+
+    @Override
+    public void logFailed(Payment payment) {}
 
     @Override
     public void logExternalError(Payment payment, Exception exception) {}

@@ -166,4 +166,44 @@ public class RabbitMessagingConfig {
                 .to(paymentExchange)
                 .with(properties.getDlq().getPaymentPendingDebug());
     }
+
+    @Bean
+    public Queue paymentFailedDebugQueue(RabbitProperties properties) {
+        return QueueBuilder
+                .durable(properties.getQueue().getPaymentFailedDebug())
+                .deadLetterExchange(properties.getExchange().getPayment())
+                .deadLetterRoutingKey(properties.getDlq().getPaymentFailedDebug())
+                .build();
+    }
+
+    @Bean
+    public Queue paymentFailedDebugDlq(RabbitProperties properties) {
+        return QueueBuilder
+                .durable(properties.getDlq().getPaymentFailedDebug())
+                .build();
+    }
+
+    @Bean
+    public Binding paymentFailedDebugBinding(
+            Queue paymentFailedDebugQueue,
+            DirectExchange paymentExchange,
+            RabbitProperties properties
+    ) {
+        return BindingBuilder
+                .bind(paymentFailedDebugQueue)
+                .to(paymentExchange)
+                .with(properties.getRoutingKey().getPaymentFailed());
+    }
+
+    @Bean
+    public Binding paymentFailedDebugDlqBinding(
+            Queue paymentFailedDebugDlq,
+            DirectExchange paymentExchange,
+            RabbitProperties properties
+    ) {
+        return BindingBuilder
+                .bind(paymentFailedDebugDlq)
+                .to(paymentExchange)
+                .with(properties.getDlq().getPaymentFailedDebug());
+    }
 }

@@ -7,4 +7,6 @@ public interface PaymentEventPublisherGateway {
     void publishApproved(Payment payment);
 
     void publishPending(Payment payment);
+
+    void publishFailed(Payment payment);
 }

@@ -43,6 +43,15 @@ public class RabbitPaymentEventPublisherAdapter implements PaymentEventPublisher
         );
     }
 
+    @Override
+    public void publishFailed(Payment payment) {
+        paymentEventRabbitProducer.send(
+                rabbitProperties.getExchange().getPayment(),
+                rabbitProperties.getRoutingKey().getPaymentFailed(),
+                toMessage(payment)
+        );
+    }
+
     private PaymentEventMessage toMessage(Payment payment) {
         return new PaymentEventMessage(
                 payment.getId(),

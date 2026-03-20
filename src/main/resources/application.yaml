@@ -60,16 +60,19 @@ app:
       order-created: ${APP_RABBIT_ROUTING_KEY_ORDER_CREATED:order.created}
       payment-approved: ${APP_RABBIT_ROUTING_KEY_PAYMENT_APPROVED:payment.approved}
       payment-pending: ${APP_RABBIT_ROUTING_KEY_PAYMENT_PENDING:payment.pending}
+      payment-failed: ${APP_RABBIT_ROUTING_KEY_PAYMENT_FAILED:payment.failed}
 
     queue:
       payment-order-created: ${APP_RABBIT_QUEUE_PAYMENT_ORDER_CREATED:payment.order.created}
       payment-approved-debug: ${APP_RABBIT_QUEUE_PAYMENT_APPROVED_DEBUG:payment.approved.debug}
       payment-pending-debug: ${APP_RABBIT_QUEUE_PAYMENT_PENDING_DEBUG:payment.pending.debug}
+      payment-failed-debug: ${APP_RABBIT_QUEUE_PAYMENT_FAILED_DEBUG:payment.failed.debug}
 
     dlq:
       payment-order-created: ${APP_RABBIT_DLQ_PAYMENT_ORDER_CREATED:payment.order.created.dlq}
       payment-approved-debug: ${APP_RABBIT_DLQ_PAYMENT_APPROVED_DEBUG:payment.approved.debug.dlq}
       payment-pending-debug: ${APP_RABBIT_DLQ_PAYMENT_PENDING_DEBUG:payment.pending.debug.dlq}
+      payment-failed-debug: ${APP_RABBIT_DLQ_PAYMENT_FAILED_DEBUG:payment.failed.debug.dlq}
 
 
   payment:
