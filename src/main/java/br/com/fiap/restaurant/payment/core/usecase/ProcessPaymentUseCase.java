@@ -2,7 +2,7 @@ package br.com.fiap.restaurant.payment.core.usecase;
 
 import br.com.fiap.restaurant.payment.core.domain.model.Payment;
 import br.com.fiap.restaurant.payment.core.gateway.ExternalPaymentProcessorGateway;
-import br.com.fiap.restaurant.payment.core.gateway.PaymentEventPublisherGateway;
+import br.com.fiap.restaurant.payment.core.gateway.PaymentFinalizationGateway;
 import br.com.fiap.restaurant.payment.core.gateway.PaymentObservabilityGateway;
 import br.com.fiap.restaurant.payment.core.gateway.PaymentRepositoryGateway;
 import br.com.fiap.restaurant.payment.core.usecase.command.ProcessPaymentCommand;
@@ -14,20 +14,20 @@ public class ProcessPaymentUseCase {
 
     private final PaymentRepositoryGateway paymentRepositoryGateway;
     private final ExternalPaymentProcessorGateway externalPaymentProcessorGateway;
-    private final PaymentEventPublisherGateway paymentEventPublisherGateway;
+    private final PaymentFinalizationGateway paymentFinalizationGateway;
     private final PaymentObservabilityGateway paymentObservabilityGateway;
     private final Duration retryBackoff;
 
     public ProcessPaymentUseCase(
             PaymentRepositoryGateway paymentRepositoryGateway,
             ExternalPaymentProcessorGateway externalPaymentProcessorGateway,
-            PaymentEventPublisherGateway paymentEventPublisherGateway,
+            PaymentFinalizationGateway paymentFinalizationGateway,
             PaymentObservabilityGateway paymentObservabilityGateway,
             Duration retryBackoff
     ) {
         this.paymentRepositoryGateway = paymentRepositoryGateway;
         this.externalPaymentProcessorGateway = externalPaymentProcessorGateway;
-        this.paymentEventPublisherGateway = paymentEventPublisherGateway;
+        this.paymentFinalizationGateway = paymentFinalizationGateway;
         this.paymentObservabilityGateway = paymentObservabilityGateway;
         this.retryBackoff = Objects.requireNonNull(retryBackoff, "retryBackoff é obrigatório");
     }
@@ -84,29 +84,27 @@ public class ProcessPaymentUseCase {
 
             if (approved) {
                 payment.approve();
-                return persistAndPublishApproved(payment);
+                return persistAndEnqueueApproved(payment);
             }
 
             payment.registerRetryFailure(retryBackoff);
-            return persistAndPublishPending(payment);
+            return persistAndEnqueuePending(payment);
 
         } catch (Exception exception) {
             paymentObservabilityGateway.logExternalError(payment, exception);
             payment.registerRetryFailure(retryBackoff);
-            return persistAndPublishPending(payment);
+            return persistAndEnqueuePending(payment);
         }
     }
 
-    private Payment persistAndPublishApproved(Payment payment) {
-        Payment savedPayment = paymentRepositoryGateway.save(payment);
-        paymentEventPublisherGateway.publishApproved(savedPayment);
+    private Payment persistAndEnqueueApproved(Payment payment) {
+        Payment savedPayment = paymentFinalizationGateway.saveApprovedAndEnqueue(payment);
         paymentObservabilityGateway.logApproved(savedPayment);
         return savedPayment;
     }
 
-    private Payment persistAndPublishPending(Payment payment) {
-        Payment savedPayment = paymentRepositoryGateway.save(payment);
-        paymentEventPublisherGateway.publishPending(savedPayment);
+    private Payment persistAndEnqueuePending(Payment payment) {
+        Payment savedPayment = paymentFinalizationGateway.savePendingAndEnqueue(payment);
         paymentObservabilityGateway.logPending(savedPayment);
         return savedPayment;
     }

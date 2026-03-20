@@ -1,5 +1,6 @@
 package br.com.fiap.restaurant.payment;
 
+import br.com.fiap.restaurant.payment.infra.config.PaymentOutboxPublisherProperties;
 import br.com.fiap.restaurant.payment.infra.config.PaymentRetryPolicyProperties;
 import br.com.fiap.restaurant.payment.infra.config.PaymentRetrySchedulerProperties;
 import org.springframework.boot.SpringApplication;
@@ -11,7 +12,8 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 @EnableScheduling
 @EnableConfigurationProperties({
 		PaymentRetrySchedulerProperties.class,
-		PaymentRetryPolicyProperties.class
+		PaymentRetryPolicyProperties.class,
+		PaymentOutboxPublisherProperties.class
 })
 public class PaymentServiceApplication {
 

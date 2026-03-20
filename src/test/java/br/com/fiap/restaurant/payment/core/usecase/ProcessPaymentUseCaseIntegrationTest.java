@@ -1,12 +1,16 @@
 package br.com.fiap.restaurant.payment.core.usecase;
 
+import br.com.fiap.restaurant.payment.core.domain.model.OutboxStatus;
 import br.com.fiap.restaurant.payment.core.domain.model.Payment;
+import br.com.fiap.restaurant.payment.core.domain.model.PaymentEventType;
 import br.com.fiap.restaurant.payment.core.domain.model.PaymentStatus;
 import br.com.fiap.restaurant.payment.core.gateway.ExternalPaymentProcessorGateway;
-import br.com.fiap.restaurant.payment.core.gateway.PaymentEventPublisherGateway;
 import br.com.fiap.restaurant.payment.core.usecase.command.ProcessPaymentCommand;
+import br.com.fiap.restaurant.payment.infra.persistence.adapter.PaymentFinalizationAdapter;
+import br.com.fiap.restaurant.payment.infra.persistence.adapter.PaymentOutboxPersistenceMapper;
 import br.com.fiap.restaurant.payment.infra.persistence.adapter.PaymentPersistenceMapper;
 import br.com.fiap.restaurant.payment.infra.persistence.adapter.PaymentRepositoryAdapter;
+import br.com.fiap.restaurant.payment.infra.persistence.repository.SpringDataPaymentOutboxRepository;
 import br.com.fiap.restaurant.payment.infra.persistence.repository.SpringDataPaymentRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -30,7 +34,9 @@ import static org.mockito.Mockito.*;
 @Import({
         ProcessPaymentUseCaseITConfig.class,
         PaymentRepositoryAdapter.class,
-        PaymentPersistenceMapper.class
+        PaymentPersistenceMapper.class,
+        PaymentFinalizationAdapter.class,
+        PaymentOutboxPersistenceMapper.class
 })
 class ProcessPaymentUseCaseIntegrationTest {
 
@@ -40,20 +46,21 @@ class ProcessPaymentUseCaseIntegrationTest {
     @Autowired
     private SpringDataPaymentRepository springDataPaymentRepository;
 
+    @Autowired
+    private SpringDataPaymentOutboxRepository springDataPaymentOutboxRepository;
+
     @MockitoBean
     private ExternalPaymentProcessorGateway externalPaymentProcessorGateway;
 
-    @MockitoBean
-    private PaymentEventPublisherGateway paymentEventPublisherGateway;
-
     @BeforeEach
     void setUp() {
+        springDataPaymentOutboxRepository.deleteAll();
         springDataPaymentRepository.deleteAll();
-        reset(externalPaymentProcessorGateway, paymentEventPublisherGateway);
+        reset(externalPaymentProcessorGateway);
     }
 
     @Test
-    void shouldPersistApprovedPaymentWhenExternalProcessorApproves() {
+    void shouldPersistApprovedPaymentAndCreateApprovedOutboxEventWhenExternalProcessorApproves() {
         Long orderId = 1L;
         UUID clientId = UUID.randomUUID();
         BigDecimal amount = new BigDecimal("120.00");
@@ -75,22 +82,25 @@ class ProcessPaymentUseCaseIntegrationTest {
         assertEquals(PaymentStatus.APPROVED.name(), savedEntity.get().getStatus());
         assertEquals(new BigDecimal("120.00"), savedEntity.get().getAmount());
         assertEquals(clientId, savedEntity.get().getClientId());
-        assertEquals(0, savedEntity.get().getRetryCount());
-        assertNull(savedEntity.get().getLastRetryAt());
-        assertNull(savedEntity.get().getNextRetryAt());
 
         assertEquals(1, springDataPaymentRepository.findAll().size());
+        assertEquals(1, springDataPaymentOutboxRepository.findAll().size());
+
+        var outboxEntity = springDataPaymentOutboxRepository.findAll().get(0);
+        assertEquals(result.getId(), outboxEntity.getAggregateId());
+        assertEquals(PaymentEventType.PAYMENT_APPROVED.name(), outboxEntity.getEventType());
+        assertEquals("ex.payment", outboxEntity.getExchangeName());
+        assertEquals("payment.approved", outboxEntity.getRoutingKey());
+        assertEquals(OutboxStatus.PENDING.name(), outboxEntity.getStatus());
+        assertNull(outboxEntity.getPublishedAt());
+        assertTrue(outboxEntity.getPayload().contains("\"status\":\"APPROVED\""));
 
         verify(externalPaymentProcessorGateway, times(1))
                 .process(any(UUID.class), eq(clientId), eq(amount));
-        verify(paymentEventPublisherGateway, times(1))
-                .publishApproved(any(Payment.class));
-        verify(paymentEventPublisherGateway, never())
-                .publishPending(any(Payment.class));
     }
 
     @Test
-    void shouldPersistPendingPaymentWithInitialRetryMetadataWhenExternalProcessorReturnsFalse() {
+    void shouldPersistPendingPaymentAndCreatePendingOutboxEventWhenExternalProcessorReturnsFalse() {
         Long orderId = 2L;
         UUID clientId = UUID.randomUUID();
         BigDecimal amount = new BigDecimal("55.90");
@@ -117,17 +127,21 @@ class ProcessPaymentUseCaseIntegrationTest {
         assertNotNull(savedEntity.get().getNextRetryAt());
 
         assertEquals(1, springDataPaymentRepository.findAll().size());
+        assertEquals(1, springDataPaymentOutboxRepository.findAll().size());
+
+        var outboxEntity = springDataPaymentOutboxRepository.findAll().get(0);
+        assertEquals(result.getId(), outboxEntity.getAggregateId());
+        assertEquals(PaymentEventType.PAYMENT_PENDING.name(), outboxEntity.getEventType());
+        assertEquals("payment.pending", outboxEntity.getRoutingKey());
+        assertEquals(OutboxStatus.PENDING.name(), outboxEntity.getStatus());
+        assertTrue(outboxEntity.getPayload().contains("\"status\":\"PENDING\""));
 
         verify(externalPaymentProcessorGateway, times(1))
                 .process(any(UUID.class), eq(clientId), eq(amount));
-        verify(paymentEventPublisherGateway, never())
-                .publishApproved(any(Payment.class));
-        verify(paymentEventPublisherGateway, times(1))
-                .publishPending(any(Payment.class));
     }
 
     @Test
-    void shouldPersistPendingPaymentWithInitialRetryMetadataWhenExternalProcessorThrowsException() {
+    void shouldPersistPendingPaymentAndCreatePendingOutboxEventWhenExternalProcessorThrowsException() {
         Long orderId = 3L;
         UUID clientId = UUID.randomUUID();
         BigDecimal amount = new BigDecimal("77.50");
@@ -149,22 +163,21 @@ class ProcessPaymentUseCaseIntegrationTest {
         assertEquals(PaymentStatus.PENDING.name(), savedEntity.get().getStatus());
         assertEquals(new BigDecimal("77.50"), savedEntity.get().getAmount());
         assertEquals(clientId, savedEntity.get().getClientId());
-        assertEquals(1, savedEntity.get().getRetryCount());
-        assertNotNull(savedEntity.get().getLastRetryAt());
-        assertNotNull(savedEntity.get().getNextRetryAt());
 
         assertEquals(1, springDataPaymentRepository.findAll().size());
+        assertEquals(1, springDataPaymentOutboxRepository.findAll().size());
+
+        var outboxEntity = springDataPaymentOutboxRepository.findAll().get(0);
+        assertEquals(PaymentEventType.PAYMENT_PENDING.name(), outboxEntity.getEventType());
+        assertEquals("payment.pending", outboxEntity.getRoutingKey());
+        assertEquals(OutboxStatus.PENDING.name(), outboxEntity.getStatus());
 
         verify(externalPaymentProcessorGateway, times(1))
                 .process(any(UUID.class), eq(clientId), eq(amount));
-        verify(paymentEventPublisherGateway, never())
-                .publishApproved(any(Payment.class));
-        verify(paymentEventPublisherGateway, times(1))
-                .publishPending(any(Payment.class));
     }
 
     @Test
-    void shouldReturnExistingPaymentWhenPaymentAlreadyExistsForOrder() {
+    void shouldReturnExistingPaymentWithoutCreatingNewOutboxEventWhenPaymentAlreadyExistsForOrder() {
         Long orderId = 4L;
         UUID clientId = UUID.randomUUID();
         BigDecimal amount = new BigDecimal("120.00");
@@ -178,10 +191,11 @@ class ProcessPaymentUseCaseIntegrationTest {
 
         assertNotNull(firstResult);
         assertNotNull(secondResult);
-
         assertEquals(firstResult.getId(), secondResult.getId());
         assertEquals(PaymentStatus.APPROVED, secondResult.getStatus());
+
         assertEquals(1, springDataPaymentRepository.findAll().size());
+        assertEquals(1, springDataPaymentOutboxRepository.findAll().size());
 
         var savedEntity = springDataPaymentRepository.findByOrderId(orderId);
         assertTrue(savedEntity.isPresent());
@@ -191,9 +205,5 @@ class ProcessPaymentUseCaseIntegrationTest {
 
         verify(externalPaymentProcessorGateway, times(1))
                 .process(any(UUID.class), eq(clientId), eq(amount));
-        verify(paymentEventPublisherGateway, times(1))
-                .publishApproved(any(Payment.class));
-        verify(paymentEventPublisherGateway, never())
-                .publishPending(any(Payment.class));
     }
 }

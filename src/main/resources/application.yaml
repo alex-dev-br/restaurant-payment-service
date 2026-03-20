@@ -84,6 +84,12 @@ app:
         max-attempts: 3
         publish-pending-on-retry-failure: false
 
+    outbox:
+      publisher:
+        enabled: true
+        fixed-delay-ms: 5000
+        batch-size: 100
+
   external-payment:
     fake-enabled: ${APP_EXTERNAL_PAYMENT_FAKE_ENABLED:false}
     base-url: ${APP_EXTERNAL_PAYMENT_BASE_URL:http://localhost:8089}

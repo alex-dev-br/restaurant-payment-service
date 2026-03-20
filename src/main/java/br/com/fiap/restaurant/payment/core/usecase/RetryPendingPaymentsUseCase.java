@@ -2,7 +2,7 @@ package br.com.fiap.restaurant.payment.core.usecase;
 
 import br.com.fiap.restaurant.payment.core.domain.model.Payment;
 import br.com.fiap.restaurant.payment.core.gateway.ExternalPaymentProcessorGateway;
-import br.com.fiap.restaurant.payment.core.gateway.PaymentEventPublisherGateway;
+import br.com.fiap.restaurant.payment.core.gateway.PaymentFinalizationGateway;
 import br.com.fiap.restaurant.payment.core.gateway.PaymentObservabilityGateway;
 import br.com.fiap.restaurant.payment.core.gateway.PaymentRepositoryGateway;
 
@@ -15,7 +15,7 @@ public class RetryPendingPaymentsUseCase {
 
     private final PaymentRepositoryGateway paymentRepositoryGateway;
     private final ExternalPaymentProcessorGateway externalPaymentProcessorGateway;
-    private final PaymentEventPublisherGateway paymentEventPublisherGateway;
+    private final PaymentFinalizationGateway paymentFinalizationGateway;
     private final PaymentObservabilityGateway paymentObservabilityGateway;
     private final Duration retryBackoff;
     private final int maxRetryCount;
@@ -24,7 +24,7 @@ public class RetryPendingPaymentsUseCase {
     public RetryPendingPaymentsUseCase(
             PaymentRepositoryGateway paymentRepositoryGateway,
             ExternalPaymentProcessorGateway externalPaymentProcessorGateway,
-            PaymentEventPublisherGateway paymentEventPublisherGateway,
+            PaymentFinalizationGateway paymentFinalizationGateway,
             PaymentObservabilityGateway paymentObservabilityGateway,
             Duration retryBackoff,
             int maxRetryCount,
@@ -32,7 +32,7 @@ public class RetryPendingPaymentsUseCase {
     ) {
         this.paymentRepositoryGateway = paymentRepositoryGateway;
         this.externalPaymentProcessorGateway = externalPaymentProcessorGateway;
-        this.paymentEventPublisherGateway = paymentEventPublisherGateway;
+        this.paymentFinalizationGateway = paymentFinalizationGateway;
         this.paymentObservabilityGateway = paymentObservabilityGateway;
         this.retryBackoff = Objects.requireNonNull(retryBackoff, "retryBackoff é obrigatório");
         this.maxRetryCount = maxRetryCount;
@@ -60,9 +60,8 @@ public class RetryPendingPaymentsUseCase {
 
             if (approved) {
                 payment.approve();
-                Payment savedPayment = paymentRepositoryGateway.save(payment);
+                Payment savedPayment = paymentFinalizationGateway.saveApprovedAndEnqueue(payment);
                 paymentObservabilityGateway.logApproved(savedPayment);
-                paymentEventPublisherGateway.publishApproved(savedPayment);
                 return;
             }
 
@@ -77,18 +76,20 @@ public class RetryPendingPaymentsUseCase {
     private void handleRetryFailure(Payment payment) {
         if (payment.getRetryCount() + 1 >= maxRetryCount) {
             payment.fail();
-            Payment savedPayment = paymentRepositoryGateway.save(payment);
+            Payment savedPayment = paymentFinalizationGateway.saveFailedAndEnqueue(payment);
             paymentObservabilityGateway.logFailed(savedPayment);
-            paymentEventPublisherGateway.publishFailed(savedPayment);
             return;
         }
 
         payment.registerRetryFailure(retryBackoff);
-        Payment savedPayment = paymentRepositoryGateway.save(payment);
-        paymentObservabilityGateway.logPending(savedPayment);
 
+        Payment savedPayment;
         if (publishPendingOnRetryFailure) {
-            paymentEventPublisherGateway.publishPending(savedPayment);
+            savedPayment = paymentFinalizationGateway.savePendingAndEnqueue(payment);
+        } else {
+            savedPayment = paymentRepositoryGateway.save(payment);
         }
+
+        paymentObservabilityGateway.logPending(savedPayment);
     }
 }

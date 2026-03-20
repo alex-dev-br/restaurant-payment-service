@@ -3,7 +3,7 @@ package br.com.fiap.restaurant.payment.core.usecase;
 import br.com.fiap.restaurant.payment.core.domain.model.Payment;
 import br.com.fiap.restaurant.payment.core.domain.model.PaymentStatus;
 import br.com.fiap.restaurant.payment.core.gateway.ExternalPaymentProcessorGateway;
-import br.com.fiap.restaurant.payment.core.gateway.PaymentEventPublisherGateway;
+import br.com.fiap.restaurant.payment.core.gateway.PaymentFinalizationGateway;
 import br.com.fiap.restaurant.payment.core.gateway.PaymentObservabilityGateway;
 import br.com.fiap.restaurant.payment.core.gateway.PaymentRepositoryGateway;
 import org.junit.jupiter.api.BeforeEach;
@@ -25,7 +25,7 @@ class RetryPendingPaymentsUseCaseTest {
 
     private PaymentRepositoryGateway paymentRepositoryGateway;
     private ExternalPaymentProcessorGateway externalPaymentProcessorGateway;
-    private PaymentEventPublisherGateway paymentEventPublisherGateway;
+    private PaymentFinalizationGateway paymentFinalizationGateway;
     private PaymentObservabilityGateway paymentObservabilityGateway;
     private RetryPendingPaymentsUseCase retryPendingPaymentsUseCase;
 
@@ -33,13 +33,13 @@ class RetryPendingPaymentsUseCaseTest {
     void setUp() {
         paymentRepositoryGateway = mock(PaymentRepositoryGateway.class);
         externalPaymentProcessorGateway = mock(ExternalPaymentProcessorGateway.class);
-        paymentEventPublisherGateway = mock(PaymentEventPublisherGateway.class);
+        paymentFinalizationGateway = mock(PaymentFinalizationGateway.class);
         paymentObservabilityGateway = mock(PaymentObservabilityGateway.class);
 
         retryPendingPaymentsUseCase = new RetryPendingPaymentsUseCase(
                 paymentRepositoryGateway,
                 externalPaymentProcessorGateway,
-                paymentEventPublisherGateway,
+                paymentFinalizationGateway,
                 paymentObservabilityGateway,
                 Duration.ofSeconds(30),
                 3,
@@ -60,7 +60,7 @@ class RetryPendingPaymentsUseCaseTest {
                 pendingPayment.getAmount()
         )).thenReturn(true);
 
-        when(paymentRepositoryGateway.save(any(Payment.class)))
+        when(paymentFinalizationGateway.saveApprovedAndEnqueue(any(Payment.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
 
         retryPendingPaymentsUseCase.execute();
@@ -72,16 +72,18 @@ class RetryPendingPaymentsUseCaseTest {
                 pendingPayment.getClientId(),
                 pendingPayment.getAmount()
         );
-        verify(paymentRepositoryGateway).save(any(Payment.class));
-        verify(paymentEventPublisherGateway).publishApproved(any(Payment.class));
-        verify(paymentEventPublisherGateway, never()).publishPending(any(Payment.class));
+        verify(paymentFinalizationGateway).saveApprovedAndEnqueue(any(Payment.class));
+        verify(paymentFinalizationGateway, never()).savePendingAndEnqueue(any(Payment.class));
+        verify(paymentFinalizationGateway, never()).saveFailedAndEnqueue(any(Payment.class));
+        verify(paymentRepositoryGateway, never()).save(any(Payment.class));
         verify(paymentObservabilityGateway).logApproved(any(Payment.class));
         verify(paymentObservabilityGateway, never()).logPending(any(Payment.class));
+        verify(paymentObservabilityGateway, never()).logFailed(any(Payment.class));
         verify(paymentObservabilityGateway, never()).logExternalError(any(Payment.class), any(Exception.class));
     }
 
     @Test
-    void shouldKeepPaymentPendingAndNotPublishPendingWhenRetryFailsAndPolicyDisablesIt() {
+    void shouldKeepPaymentPendingAndPersistOnlyStateWhenRetryFailsAndPolicyDisablesPendingEvent() {
         Payment pendingPayment = buildPendingPayment();
 
         when(paymentRepositoryGateway.findRetryablePendingPayments(any(OffsetDateTime.class), eq(3)))
@@ -102,9 +104,12 @@ class RetryPendingPaymentsUseCaseTest {
 
         verify(paymentRepositoryGateway).findRetryablePendingPayments(any(OffsetDateTime.class), eq(3));
         verify(paymentRepositoryGateway).save(paymentCaptor.capture());
-        verify(paymentEventPublisherGateway, never()).publishApproved(any(Payment.class));
-        verify(paymentEventPublisherGateway, never()).publishPending(any(Payment.class));
+        verify(paymentFinalizationGateway, never()).saveApprovedAndEnqueue(any(Payment.class));
+        verify(paymentFinalizationGateway, never()).savePendingAndEnqueue(any(Payment.class));
+        verify(paymentFinalizationGateway, never()).saveFailedAndEnqueue(any(Payment.class));
         verify(paymentObservabilityGateway).logPending(any(Payment.class));
+        verify(paymentObservabilityGateway, never()).logApproved(any(Payment.class));
+        verify(paymentObservabilityGateway, never()).logFailed(any(Payment.class));
 
         Payment savedPayment = paymentCaptor.getValue();
         assertEquals(PaymentStatus.PENDING, savedPayment.getStatus());
@@ -114,13 +119,13 @@ class RetryPendingPaymentsUseCaseTest {
     }
 
     @Test
-    void shouldPublishPendingWhenRetryFailsAndPolicyEnablesIt() {
+    void shouldEnqueuePendingEventWhenRetryFailsAndPolicyEnablesPendingEvent() {
         Payment pendingPayment = buildPendingPayment();
 
         RetryPendingPaymentsUseCase useCase = new RetryPendingPaymentsUseCase(
                 paymentRepositoryGateway,
                 externalPaymentProcessorGateway,
-                paymentEventPublisherGateway,
+                paymentFinalizationGateway,
                 paymentObservabilityGateway,
                 Duration.ofSeconds(30),
                 3,
@@ -136,16 +141,20 @@ class RetryPendingPaymentsUseCaseTest {
                 pendingPayment.getAmount()
         )).thenReturn(false);
 
-        when(paymentRepositoryGateway.save(any(Payment.class)))
+        when(paymentFinalizationGateway.savePendingAndEnqueue(any(Payment.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
 
         useCase.execute();
 
-        verify(paymentEventPublisherGateway).publishPending(any(Payment.class));
+        verify(paymentFinalizationGateway).savePendingAndEnqueue(any(Payment.class));
+        verify(paymentRepositoryGateway, never()).save(any(Payment.class));
+        verify(paymentFinalizationGateway, never()).saveApprovedAndEnqueue(any(Payment.class));
+        verify(paymentFinalizationGateway, never()).saveFailedAndEnqueue(any(Payment.class));
+        verify(paymentObservabilityGateway).logPending(any(Payment.class));
     }
 
     @Test
-    void shouldKeepPaymentPendingAndNotPublishPendingWhenRetryThrowsExceptionAndPolicyDisablesIt() {
+    void shouldKeepPaymentPendingAndPersistOnlyStateWhenRetryThrowsExceptionAndPolicyDisablesPendingEvent() {
         Payment pendingPayment = buildPendingPayment();
 
         when(paymentRepositoryGateway.findRetryablePendingPayments(any(OffsetDateTime.class), eq(3)))
@@ -166,21 +175,13 @@ class RetryPendingPaymentsUseCaseTest {
                 eq(pendingPayment),
                 any(RuntimeException.class)
         );
-        verify(paymentEventPublisherGateway, never()).publishApproved(any(Payment.class));
-        verify(paymentEventPublisherGateway, never()).publishPending(any(Payment.class));
+        verify(paymentRepositoryGateway).save(any(Payment.class));
+        verify(paymentFinalizationGateway, never()).saveApprovedAndEnqueue(any(Payment.class));
+        verify(paymentFinalizationGateway, never()).savePendingAndEnqueue(any(Payment.class));
+        verify(paymentFinalizationGateway, never()).saveFailedAndEnqueue(any(Payment.class));
         verify(paymentObservabilityGateway).logPending(any(Payment.class));
-    }
-
-    private Payment buildPendingPayment() {
-        return new Payment(
-                UUID.randomUUID(),
-                100L,
-                UUID.randomUUID(),
-                new BigDecimal("150.00"),
-                PaymentStatus.PENDING,
-                OffsetDateTime.now(),
-                OffsetDateTime.now()
-        );
+        verify(paymentObservabilityGateway, never()).logApproved(any(Payment.class));
+        verify(paymentObservabilityGateway, never()).logFailed(any(Payment.class));
     }
 
     @Test
@@ -207,21 +208,33 @@ class RetryPendingPaymentsUseCaseTest {
                 pendingPayment.getAmount()
         )).thenReturn(false);
 
-        when(paymentRepositoryGateway.save(any(Payment.class)))
+        when(paymentFinalizationGateway.saveFailedAndEnqueue(any(Payment.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
 
         retryPendingPaymentsUseCase.execute();
 
-        verify(paymentRepositoryGateway).save(argThat(payment ->
+        verify(paymentFinalizationGateway).saveFailedAndEnqueue(argThat(payment ->
                 payment.getStatus() == PaymentStatus.FAILED
                         && payment.getRetryCount() == 3
                         && payment.getNextRetryAt() == null
         ));
 
-        verify(paymentEventPublisherGateway).publishFailed(any(Payment.class));
-        verify(paymentEventPublisherGateway, never()).publishPending(any(Payment.class));
-        verify(paymentEventPublisherGateway, never()).publishApproved(any(Payment.class));
+        verify(paymentFinalizationGateway, never()).saveApprovedAndEnqueue(any(Payment.class));
+        verify(paymentFinalizationGateway, never()).savePendingAndEnqueue(any(Payment.class));
+        verify(paymentRepositoryGateway, never()).save(any(Payment.class));
         verify(paymentObservabilityGateway).logFailed(any(Payment.class));
+        verify(paymentObservabilityGateway, never()).logApproved(any(Payment.class));
     }
 
+    private Payment buildPendingPayment() {
+        return new Payment(
+                UUID.randomUUID(),
+                100L,
+                UUID.randomUUID(),
+                new BigDecimal("150.00"),
+                PaymentStatus.PENDING,
+                OffsetDateTime.now(),
+                OffsetDateTime.now()
+        );
+    }
 }
