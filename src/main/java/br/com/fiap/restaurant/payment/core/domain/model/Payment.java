@@ -1,6 +1,7 @@
 package br.com.fiap.restaurant.payment.core.domain.model;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.OffsetDateTime;
 import java.util.Objects;
 import java.util.UUID;
@@ -24,12 +25,14 @@ public class Payment {
             OffsetDateTime createdAt,
             OffsetDateTime updatedAt
     ) {
-        validate(id, orderId, clientId, amount, status, createdAt, updatedAt);
+        BigDecimal normalizedAmount = normalizeAmount(amount);
+
+        validate(id, orderId, clientId, normalizedAmount, status, createdAt, updatedAt);
 
         this.id = id;
         this.orderId = orderId;
         this.clientId = clientId;
-        this.amount = amount;
+        this.amount = normalizedAmount;
         this.status = status;
         this.createdAt = createdAt;
         this.updatedAt = updatedAt;
@@ -61,6 +64,21 @@ public class Payment {
 
     public boolean isApproved() {
         return PaymentStatus.APPROVED.equals(this.status);
+    }
+
+    private static BigDecimal normalizeAmount(BigDecimal amount) {
+        if (amount == null) {
+            return null;
+        }
+
+        try {
+            return amount.setScale(2, RoundingMode.UNNECESSARY);
+        } catch (ArithmeticException exception) {
+            throw new IllegalArgumentException(
+                    "O valor do pagamento deve ter no máximo 2 casas decimais.",
+                    exception
+            );
+        }
     }
 
     private static void validate(

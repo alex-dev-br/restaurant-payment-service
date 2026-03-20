@@ -28,6 +28,17 @@ class PaymentTest {
     }
 
     @Test
+    void shouldNormalizeAmountToTwoDecimalPlaces() {
+        Payment payment = Payment.createPending(
+                1L,
+                UUID.randomUUID(),
+                new BigDecimal("10.5")
+        );
+
+        assertEquals(new BigDecimal("10.50"), payment.getAmount());
+    }
+
+    @Test
     void shouldApprovePaymentSuccessfully() {
         Payment payment = new Payment(
                 UUID.randomUUID(),
@@ -61,6 +72,24 @@ class PaymentTest {
         );
 
         assertEquals("O valor do pagamento deve ser maior que zero.", exception.getMessage());
+    }
+
+    @Test
+    void shouldThrowExceptionWhenAmountHasMoreThanTwoDecimalPlaces() {
+        IllegalArgumentException exception = assertThrows(
+                IllegalArgumentException.class,
+                () -> new Payment(
+                        UUID.randomUUID(),
+                        1L,
+                        UUID.randomUUID(),
+                        new BigDecimal("10.505"),
+                        PaymentStatus.PENDING,
+                        OffsetDateTime.now(),
+                        OffsetDateTime.now()
+                )
+        );
+
+        assertEquals("O valor do pagamento deve ter no máximo 2 casas decimais.", exception.getMessage());
     }
 
     @Test

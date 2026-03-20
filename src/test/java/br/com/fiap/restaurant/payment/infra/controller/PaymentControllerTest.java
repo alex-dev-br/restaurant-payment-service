@@ -169,4 +169,22 @@ class PaymentControllerTest {
                         "Pagamento não encontrado para o orderId: " + orderId
                 ));
     }
+
+    @Test
+    void shouldReturnBadRequestWhenAmountHasMoreThanTwoDecimalPlaces() throws Exception {
+        mockMvc.perform(post("/payments/process")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                            {
+                              "orderId": 1,
+                              "clientId": "22222222-2222-2222-2222-222222222222",
+                              "amount": 10.505
+                            }
+                            """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.error").value("Bad Request"))
+                .andExpect(jsonPath("$.message").value("Erro de validação"))
+                .andExpect(jsonPath("$.fields.amount").value("amount deve ter no máximo 2 casas decimais"));
+    }
 }

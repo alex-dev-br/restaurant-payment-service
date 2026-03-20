@@ -61,7 +61,7 @@ class HttpExternalPaymentProcessorClientTest {
                 .andExpect(method(HttpMethod.POST))
                 .andExpect(content().json("""
                         {
-                          "valor": 100,
+                          "valor": 10000,
                           "pagamento_id": "11111111-1111-1111-1111-111111111111",
                           "cliente_id": "22222222-2222-2222-2222-222222222222"
                         }
@@ -81,7 +81,39 @@ class HttpExternalPaymentProcessorClientTest {
                         }
                         """, MediaType.APPLICATION_JSON));
 
-        boolean result = client.process(paymentId, clientId, BigDecimal.valueOf(100));
+        boolean result = client.process(paymentId, clientId, new BigDecimal("100.00"));
+
+        assertTrue(result);
+        server.verify();
+    }
+
+    @Test
+    void shouldConvertAmountWithTwoDecimalPlacesToIntegerCentsForProcessor() {
+        server.expect(requestTo(BASE_URL + REQUEST_PATH))
+                .andExpect(method(HttpMethod.POST))
+                .andExpect(content().json("""
+                        {
+                          "valor": 1050,
+                          "pagamento_id": "11111111-1111-1111-1111-111111111111",
+                          "cliente_id": "22222222-2222-2222-2222-222222222222"
+                        }
+                        """))
+                .andRespond(withCreatedEntity(null)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .body("""
+                              {"status":"accepted"}
+                              """));
+
+        server.expect(requestTo(BASE_URL + REQUEST_PATH + "/" + paymentId))
+                .andExpect(method(HttpMethod.GET))
+                .andRespond(withSuccess("""
+                        {
+                          "pagamento_id": "11111111-1111-1111-1111-111111111111",
+                          "status": "pago"
+                        }
+                        """, MediaType.APPLICATION_JSON));
+
+        boolean result = client.process(paymentId, clientId, new BigDecimal("10.50"));
 
         assertTrue(result);
         server.verify();
@@ -106,7 +138,7 @@ class HttpExternalPaymentProcessorClientTest {
                         }
                         """, MediaType.APPLICATION_JSON));
 
-        boolean result = client.process(paymentId, clientId, BigDecimal.valueOf(100));
+        boolean result = client.process(paymentId, clientId, new BigDecimal("100.00"));
 
         assertFalse(result);
         server.verify();
@@ -122,7 +154,7 @@ class HttpExternalPaymentProcessorClientTest {
                               {"status":"rejected"}
                               """));
 
-        boolean result = client.process(paymentId, clientId, BigDecimal.valueOf(100));
+        boolean result = client.process(paymentId, clientId, new BigDecimal("100.00"));
 
         assertFalse(result);
         server.verify();
@@ -135,16 +167,16 @@ class HttpExternalPaymentProcessorClientTest {
                 .andRespond(withServerError());
 
         assertThrows(RestClientResponseException.class, () ->
-                client.process(paymentId, clientId, BigDecimal.valueOf(100))
+                client.process(paymentId, clientId, new BigDecimal("100.00"))
         );
 
         server.verify();
     }
 
     @Test
-    void shouldThrowArithmeticExceptionWhenAmountHasDecimalPlaces() {
-        assertThrows(ArithmeticException.class, () ->
-                client.process(paymentId, clientId, BigDecimal.valueOf(10.50))
+    void shouldThrowIllegalArgumentExceptionWhenAmountHasMoreThanTwoDecimalPlaces() {
+        assertThrows(IllegalArgumentException.class, () ->
+                client.process(paymentId, clientId, new BigDecimal("10.505"))
         );
     }
 
@@ -158,7 +190,7 @@ class HttpExternalPaymentProcessorClientTest {
     @Test
     void shouldThrowIllegalArgumentExceptionWhenAmountIsNegative() {
         assertThrows(IllegalArgumentException.class, () ->
-                client.process(paymentId, clientId, BigDecimal.valueOf(-5))
+                client.process(paymentId, clientId, new BigDecimal("-5.00"))
         );
     }
 }

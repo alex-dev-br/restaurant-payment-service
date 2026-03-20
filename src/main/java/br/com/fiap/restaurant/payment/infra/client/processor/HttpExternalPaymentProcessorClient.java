@@ -10,6 +10,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.UUID;
 
 @Component
@@ -34,13 +35,7 @@ public class HttpExternalPaymentProcessorClient implements ExternalPaymentProces
 
     @Override
     public boolean process(UUID paymentId, UUID clientId, BigDecimal amount) {
-        int valor = amount.intValueExact();
-
-        if (valor <= 0) {
-            throw new IllegalArgumentException(
-                    "Payment amount must be a positive integer for procpag integration"
-            );
-        }
+        int valor = toProcessorAmount(amount);
 
         ProcpagPaymentRequest request = new ProcpagPaymentRequest(
                 valor,
@@ -65,6 +60,34 @@ public class HttpExternalPaymentProcessorClient implements ExternalPaymentProces
                 .body(ProcpagPaymentStatusResponse.class);
 
         return statusResponse != null && statusResponse.isPaid();
+    }
+
+    private int toProcessorAmount(BigDecimal amount) {
+        if (amount == null) {
+            throw new IllegalArgumentException("Payment amount is required for procpag integration");
+        }
+
+        BigDecimal normalizedAmount;
+        try {
+            normalizedAmount = amount.setScale(2, RoundingMode.UNNECESSARY);
+        } catch (ArithmeticException exception) {
+            throw new IllegalArgumentException(
+                    "Payment amount must have at most 2 decimal places for procpag integration",
+                    exception
+            );
+        }
+
+        int valor = normalizedAmount
+                .movePointRight(2)
+                .intValueExact();
+
+        if (valor <= 0) {
+            throw new IllegalArgumentException(
+                    "Payment amount must be greater than zero for procpag integration"
+            );
+        }
+
+        return valor;
     }
 }
 
