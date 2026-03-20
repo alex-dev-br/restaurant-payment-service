@@ -29,15 +29,31 @@ O projeto foi desenvolvido com foco em:
     - [Endpoints disponíveis](#endpoints-disponíveis)
     - [Exemplos cURL](#exemplos-curl)
 - [🌐 Integração com Processador de Pagamentos](#-integração-com-processador-de-pagamentos)
+    - [Endpoints utilizados](#endpoints-utilizados)
+    - [Fluxo de integração](#fluxo-de-integração)
+    - [Observações importantes](#observações-importantes)
+- [💰 Contrato Monetário](#-contrato-monetário)
+    - [Representação interna do domínio](#representação-interna-do-domínio)
+    - [Representação exigida pelo `procpag`](#representação-exigida-pelo-procpag)
+    - [Convenção adotada](#convenção-adotada)
+    - [Regra de validação](#regra-de-validação)
+    - [Decisão arquitetural](#decisão-arquitetural)
 - [🛡 Resiliência](#-resiliência)
 - [🔁 Retry de Pagamentos Pendentes](#-retry-de-pagamentos-pendentes)
+    - [Fluxo esperado](#fluxo-esperado)
+    - [Configuração](#configuração)
 - [📡 Eventos do Sistema](#-eventos-do-sistema)
     - [Evento Consumido](#evento-consumido)
     - [Eventos Publicados](#eventos-publicados)
 - [🧠 Regras de Negócio](#-regras-de-negócio)
     - [Idempotência](#idempotência)
+    - [Regra adicional de valor monetário](#regra-adicional-de-valor-monetário)
 - [📊 Observabilidade](#-observabilidade)
+    - [Métricas registradas](#métricas-registradas)
+    - [Logs relevantes](#logs-relevantes)
 - [🗄 Banco de Dados](#-banco-de-dados)
+    - [Migration inicial](#migration-inicial)
+    - [Migration de idempotência](#migration-de-idempotência)
 - [🧪 Cenários Validados](#-cenários-validados)
 - [🛠 Stack Tecnológica](#-stack-tecnológica)
 - [📂 Estrutura do Projeto](#-estrutura-do-projeto)
@@ -48,6 +64,11 @@ O projeto foi desenvolvido com foco em:
 - [🧪 Testes](#-testes)
 - [🔄 Integração Contínua](#-integração-contínua)
 - [🧭 Architecture Decision Records](#-architecture-decision-records)
+    - [ADR-001 — Clean Architecture](#adr-001--clean-architecture)
+    - [ADR-002 — Comunicação Assíncrona com RabbitMQ](#adr-002--comunicação-assíncrona-com-rabbitmq)
+    - [ADR-003 — Idempotência](#adr-003--idempotência)
+    - [ADR-004 — Resiliência na Integração Externa](#adr-004--resiliência-na-integração-externa)
+    - [ADR-005 — Contrato Monetário com o Processador Externo](#adr-005--contrato-monetário-com-o-processador-externo)
 
 ---
 
@@ -273,10 +294,85 @@ O serviço integra com um **processador externo de pagamentos** disponibilizado 
 
 ## Observações importantes
 
-- o campo `valor` é enviado ao `procpag` como **inteiro positivo**
+- o `payment-service` trabalha internamente com valores monetários em `BigDecimal`
+- a persistência do pagamento utiliza `numeric(19,2)`
+- o contrato HTTP do `procpag` exige que o campo `valor` seja enviado como **inteiro**
+- o DTO enviado ao `procpag` utiliza `valor` como inteiro
 - o processador pode apresentar **falhas intermitentes**
 - falhas ou indisponibilidades resultam em pagamentos **PENDING**
 - existe suporte a client fake controlado por configuração (`app.external-payment.fake-enabled`)
+
+---
+
+# 💰 Contrato Monetário
+
+O `payment-service` adota duas representações de valor monetário, cada uma adequada ao seu contexto.
+
+## Representação interna do domínio
+
+No domínio, nos casos de uso, nos eventos e na persistência, o valor do pagamento é tratado como **valor monetário decimal**, utilizando `BigDecimal`.
+
+Exemplos válidos no domínio:
+
+- `10.00`
+- `10.50`
+- `89.90`
+- `120.00`
+
+A tabela `payments` persiste o campo `amount` como `numeric(19,2)`.
+
+## Representação exigida pelo `procpag`
+
+Na borda de integração HTTP com o `procpag`, o campo `valor` deve ser enviado como **inteiro**.
+
+Em validações manuais realizadas contra o processador externo:
+
+- payload com `valor: 100` foi aceito
+- payload com `valor: 100.50` foi rejeitado com `400 Bad Request`
+- payload com `valor: "100.50"` também foi rejeitado com `400 Bad Request`
+
+Isso indica que o `procpag` não aceita valor decimal no corpo da requisição.
+
+## Convenção adotada
+
+Para compatibilizar o domínio monetário do `payment-service` com o contrato do `procpag`, o valor será tratado da seguinte forma:
+
+- no domínio: `BigDecimal` com até 2 casas decimais
+- na integração externa: conversão para **inteiro em centavos**
+
+Exemplos:
+
+- `1.00` → `100`
+- `10.50` → `1050`
+- `89.90` → `8990`
+- `120.00` → `12000`
+
+## Regra de validação
+
+O serviço considera válidos apenas valores monetários com **até 2 casas decimais**.
+
+Exemplos:
+
+- `10` → válido
+- `10.5` → válido
+- `10.50` → válido
+- `10.505` → inválido
+
+## Decisão arquitetural
+
+O projeto **não adota truncagem silenciosa** nem arredondamento implícito na integração de pagamento.
+
+Motivos:
+
+- evitar alteração silenciosa de valor financeiro
+- preservar consistência entre pedido, pagamento e auditoria
+- manter o domínio monetário explícito e previsível
+
+Assim, a estratégia adotada é:
+
+1. aceitar valores monetários decimais no domínio
+2. validar no máximo 2 casas decimais
+3. converter para inteiro em centavos somente na integração com o `procpag`
 
 ---
 
@@ -427,18 +523,29 @@ O evento consumido possui `messageId`, e o serviço registra mensagens processad
 
 ---
 
+## Regra adicional de valor monetário
+
+O valor do pagamento:
+
+- deve ser maior que zero
+- deve possuir no máximo 2 casas decimais
+- é mantido como valor monetário decimal no domínio
+- é convertido para inteiro em centavos apenas no momento da chamada ao `procpag`
+
+---
+
 # 📊 Observabilidade
 
 O serviço possui integração com **Micrometer** e **Spring Boot Actuator** para métricas operacionais e logs de processamento.
 
 ## Métricas registradas
 
-| Métrica                          | Descrição |
-| -------------------------------- | --------- |
-| `payment.approved.total`         | total de pagamentos aprovados |
-| `payment.pending.total`          | total de pagamentos pendentes |
-| `payment.idempotent.reused.total`| pagamentos reaproveitados por idempotência |
-| `payment.processing.duration`    | duração do processamento de pagamentos |
+| Métrica                           | Descrição |
+| --------------------------------- | --------- |
+| `payment.approved.total`          | total de pagamentos aprovados |
+| `payment.pending.total`           | total de pagamentos pendentes |
+| `payment.idempotent.reused.total` | pagamentos reaproveitados por idempotência |
+| `payment.processing.duration`     | duração do processamento de pagamentos |
 
 ## Logs relevantes
 
@@ -476,6 +583,9 @@ create table payments (
 create unique index uk_payments_order_id on payments(order_id);
 create index idx_payments_client_id on payments(client_id);
 ```
+
+> O campo `amount` é persistido como valor monetário decimal com 2 casas.  
+> A conversão para inteiro acontece apenas na integração com o processador externo.
 
 ## Migration de idempotência
 
@@ -773,3 +883,25 @@ A comunicação com o processador externo utiliza mecanismos de resiliência par
 - circuit breaker
 - bulkhead
 - time limiter
+
+---
+
+## ADR-005 — Contrato Monetário com o Processador Externo
+
+O domínio do `payment-service` utiliza `BigDecimal` para representar valores monetários, preservando semântica financeira e compatibilidade com a persistência em `numeric(19,2)`.
+
+Entretanto, o processador externo `procpag` exige o campo `valor` como inteiro no payload HTTP.
+
+Diante disso, foi adotada a seguinte decisão:
+
+- manter `BigDecimal` no domínio, eventos e persistência
+- validar valores com no máximo 2 casas decimais
+- converter o valor para inteiro em centavos apenas na borda de integração com o `procpag`
+- não aplicar truncagem silenciosa nem arredondamento implícito
+
+### Benefícios
+
+- preserva a modelagem monetária correta no domínio
+- evita perda silenciosa de valor
+- reduz inconsistências entre pedido, pagamento e auditoria
+- mantém a adaptação técnica isolada na camada de infraestrutura
