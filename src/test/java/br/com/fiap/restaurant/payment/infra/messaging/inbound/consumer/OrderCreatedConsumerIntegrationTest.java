@@ -1,7 +1,8 @@
 package br.com.fiap.restaurant.payment.infra.messaging.inbound.consumer;
 
-import br.com.fiap.restaurant.payment.core.usecase.HandleOrderCreatedEventUseCase;
-import br.com.fiap.restaurant.payment.core.usecase.command.HandleOrderCreatedEventCommand;
+import br.com.fiap.restaurant.payment.core.gateway.ProcessedMessageRepositoryGateway;
+import br.com.fiap.restaurant.payment.core.usecase.ProcessPaymentUseCase;
+import br.com.fiap.restaurant.payment.core.usecase.command.ProcessPaymentCommand;
 import br.com.fiap.restaurant.payment.infra.messaging.config.RabbitProperties;
 import br.com.fiap.restaurant.payment.infra.messaging.inbound.dto.OrderCreatedMessage;
 import org.junit.jupiter.api.BeforeEach;
@@ -11,6 +12,7 @@ import org.springframework.amqp.core.AmqpAdmin;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
@@ -19,14 +21,19 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 @SpringBootTest(properties = {
         "spring.rabbitmq.listener.simple.auto-startup=true",
-        "app.payment.retry.scheduler.enabled=false"
+        "app.external-payment.fake-enabled=true",
+        "app.payment.retry.scheduler.enabled=false",
+        "app.payment.outbox.publisher.enabled=false"
 })
 @ActiveProfiles("test")
+@DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 class OrderCreatedConsumerIntegrationTest {
 
     @Autowired
@@ -39,10 +46,21 @@ class OrderCreatedConsumerIntegrationTest {
     private AmqpAdmin amqpAdmin;
 
     @MockitoBean
-    private HandleOrderCreatedEventUseCase handleOrderCreatedEventUseCase;
+    private ProcessPaymentUseCase processPaymentUseCase;
+
+    @MockitoBean
+    private ProcessedMessageRepositoryGateway processedMessageRepositoryGateway;
 
     @BeforeEach
     void setUp() {
+        reset(processPaymentUseCase, processedMessageRepositoryGateway);
+
+        when(processedMessageRepositoryGateway.registerIfAbsent(
+                org.mockito.ArgumentMatchers.any(UUID.class),
+                org.mockito.ArgumentMatchers.eq("ORDER_CREATED"),
+                org.mockito.ArgumentMatchers.anyString()
+        )).thenReturn(true);
+
         assertNotNull(rabbitProperties.getExchange());
         assertNotNull(rabbitProperties.getRoutingKey());
         assertNotNull(rabbitProperties.getQueue());
@@ -52,7 +70,7 @@ class OrderCreatedConsumerIntegrationTest {
     }
 
     @Test
-    void shouldConsumeOrderCreatedMessageAndInvokeHandleOrderCreatedEventUseCase() {
+    void shouldConsumeOrderCreatedMessageAndInvokeProcessPaymentUseCase() {
         UUID messageId = UUID.randomUUID();
         Long orderId = 1L;
         UUID clientId = UUID.randomUUID();
@@ -71,14 +89,13 @@ class OrderCreatedConsumerIntegrationTest {
                 message
         );
 
-        ArgumentCaptor<HandleOrderCreatedEventCommand> commandCaptor =
-                ArgumentCaptor.forClass(HandleOrderCreatedEventCommand.class);
+        ArgumentCaptor<ProcessPaymentCommand> commandCaptor =
+                ArgumentCaptor.forClass(ProcessPaymentCommand.class);
 
-        verify(handleOrderCreatedEventUseCase, timeout(5000)).execute(commandCaptor.capture());
+        verify(processPaymentUseCase, timeout(10000)).execute(commandCaptor.capture());
 
-        HandleOrderCreatedEventCommand capturedCommand = commandCaptor.getValue();
+        ProcessPaymentCommand capturedCommand = commandCaptor.getValue();
 
-        assertEquals(messageId, capturedCommand.messageId());
         assertEquals(orderId, capturedCommand.orderId());
         assertEquals(clientId, capturedCommand.clientId());
         assertEquals(amount, capturedCommand.amount());

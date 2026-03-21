@@ -9,6 +9,20 @@ spring:
     jpa:
         show-sql: false
 
+    datasource:
+        hikari:
+            maximum-pool-size: 2
+            minimum-idle: 0
+            idle-timeout: 10000
+            max-lifetime: 30000
+            keepalive-time: 0
+            connection-timeout: 20000
+
+    rabbitmq:
+        listener:
+            simple:
+                auto-startup: true
+
 logging:
     level:
         org.hibernate.SQL: WARN
