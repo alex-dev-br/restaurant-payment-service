@@ -25,19 +25,24 @@ O projeto foi desenvolvido com foco em:
   - [📐 Clean Architecture Diagram](#-clean-architecture-diagram)
 - [📡 Arquitetura Orientada a Eventos](#-arquitetura-orientada-a-eventos)
   - [🐇 Topologia RabbitMQ](#-topologia-rabbitmq)
+  - [🔗 Bindings principais](#-bindings-principais)
 - [🔄 Fluxo de Processamento do Pagamento](#-fluxo-de-processamento-do-pagamento)
 - [📤 Padrão Outbox](#-padrão-outbox)
+  - [Como funciona](#como-funciona)
+  - [Benefícios](#benefícios)
+  - [🔁 Evolução de eventos do mesmo pagamento](#-evolução-de-eventos-do-mesmo-pagamento)
 - [🌐 API HTTP](#-api-http)
   - [Endpoints disponíveis](#endpoints-disponíveis)
   - [Exemplos cURL](#exemplos-curl)
   - [Tratamento de erros](#tratamento-de-erros)
+  - [Observação sobre idempotência por mensagem](#observação-sobre-idempotência-por-mensagem)
 - [🌐 Integração com Processador de Pagamentos](#-integração-com-processador-de-pagamentos)
   - [Endpoints utilizados](#endpoints-utilizados)
   - [Fluxo de integração](#fluxo-de-integração)
   - [Observações importantes](#observações-importantes)
 - [💰 Contrato Monetário](#-contrato-monetário)
   - [Representação interna do domínio](#representação-interna-do-domínio)
-  - [Representação exigida pelo `procpag`](#representação-exigida-pelo-procpag)
+  - [Representação exigida pelo-procpag](#representação-exigida-pelo-procpag)
   - [Convenção adotada](#convenção-adotada)
   - [Regra de validação](#regra-de-validação)
   - [Decisão arquitetural](#decisão-arquitetural)
@@ -46,11 +51,13 @@ O projeto foi desenvolvido com foco em:
   - [Fluxo esperado](#fluxo-esperado)
   - [Política de retry](#política-de-retry)
   - [Configuração](#configuração)
+  - [Cenário de falha definitiva](#cenário-de-falha-definitiva)
 - [📡 Eventos do Sistema](#-eventos-do-sistema)
   - [Evento Consumido](#evento-consumido)
   - [Eventos Publicados](#eventos-publicados)
 - [🧠 Regras de Negócio](#-regras-de-negócio)
   - [Idempotência](#idempotência)
+  - [Comportamento em caso de mensagem duplicada](#comportamento-em-caso-de-mensagem-duplicada)
   - [Falha definitiva](#falha-definitiva)
   - [Regra adicional de valor monetário](#regra-adicional-de-valor-monetário)
 - [📊 Observabilidade](#-observabilidade)
@@ -62,6 +69,10 @@ O projeto foi desenvolvido com foco em:
   - [Migration de metadados de retry](#migration-de-metadados-de-retry)
   - [Migration de outbox](#migration-de-outbox)
 - [🧪 Cenários Validados](#-cenários-validados)
+- [🧪 Validação Manual End-to-End via RabbitMQ](#-validação-manual-end-to-end-via-rabbitmq)
+  - [Objetivo](#objetivo)
+  - [Passos](#passos)
+  - [Cenário adicional: reenvio da mesma mensagem](#cenário-adicional-reenvio-da-mesma-mensagem)
 - [🛠 Stack Tecnológica](#-stack-tecnológica)
 - [📂 Estrutura do Projeto](#-estrutura-do-projeto)
 - [🐳 Execução Local](#-execução-local)
@@ -185,6 +196,19 @@ RabbitMQ --> OtherServices
 
 ---
 
+## 🔗 Bindings principais
+
+Os bindings principais da topologia são:
+
+* `ex.order` + `order.created` → `payment.order.created`
+* `ex.payment` + `payment.approved` → `payment.approved.debug`
+* `ex.payment` + `payment.pending` → `payment.pending.debug`
+* `ex.payment` + `payment.failed` → `payment.failed.debug`
+
+As filas `.dlq` são utilizadas para inspeção e tratamento de mensagens que não puderam seguir o fluxo esperado.
+
+---
+
 # 🔄 Fluxo de Processamento do Pagamento
 
 ```mermaid
@@ -241,6 +265,25 @@ O serviço utiliza **Outbox Pattern** para garantir consistência entre a persis
 * evita perda silenciosa de eventos
 * permite retry de publicação
 * melhora auditabilidade do fluxo assíncrono
+
+---
+
+## 🔁 Evolução de eventos do mesmo pagamento
+
+Um mesmo pagamento pode gerar múltiplos registros em `payment_outbox` ao longo do seu ciclo de vida, desde que representem transições reais de estado.
+
+Exemplos:
+
+* `PENDING` → `APPROVED`
+* `PENDING` → `FAILED`
+
+Nesses casos:
+
+* o `aggregate_id` permanece o mesmo, pois representa o mesmo pagamento
+* cada transição relevante gera um novo evento de saída
+* o histórico no outbox preserva a trilha de evolução do pagamento
+
+Isso permite auditabilidade e rastreabilidade do fluxo completo.
 
 ---
 
@@ -327,6 +370,20 @@ O serviço possui tratamento global de exceções para:
   "message": "Pagamento não encontrado para o orderId: 99999"
 }
 ```
+
+---
+
+## Observação sobre idempotência por mensagem
+
+A tabela `processed_messages` é utilizada exclusivamente no fluxo assíncrono de consumo do evento `order.created`.
+
+Chamadas manuais ao endpoint HTTP `POST /payments/process`:
+
+* não utilizam `messageId`
+* não representam consumo de evento do broker
+* não passam pela proteção baseada em `processed_messages`
+
+Nesse fluxo HTTP, a proteção contra duplicidade ocorre principalmente por meio da restrição única em `order_id` e pelo reaproveitamento do pagamento já existente.
 
 ---
 
@@ -509,6 +566,16 @@ app:
         publish-pending-on-retry-failure: false
 ```
 
+## Cenário de falha definitiva
+
+Quando o processador externo permanece indisponível e o pagamento atinge o limite configurado de tentativas:
+
+* o status final do pagamento passa para `FAILED`
+* `retry_count` atinge o limite máximo
+* `next_retry_at` deixa de indicar novo processamento elegível
+* o serviço registra `payment.failed` no outbox
+* o evento `payment.failed` é publicado no RabbitMQ
+
 ---
 
 # 📡 Eventos do Sistema
@@ -614,6 +681,20 @@ Em cenários concorrentes, o serviço reaproveita o pagamento persistido pelo fl
 
 ---
 
+## Comportamento em caso de mensagem duplicada
+
+Quando o `payment-service` recebe novamente um evento `order.created` com o mesmo `messageId`:
+
+1. verifica a tabela `processed_messages`
+2. identifica que a mensagem já foi processada
+3. não cria novo pagamento
+4. não cria novo registro adicional de outbox para aquele processamento
+5. encerra o consumo sem reexecutar a lógica principal
+
+Isso garante idempotência no nível da mensagem consumida e protege o fluxo contra redelivery duplicado no broker.
+
+---
+
 ## Falha definitiva
 
 Quando `retryCount + 1 >= max-attempts`, o pagamento é marcado como `FAILED`, deixa de possuir `nextRetryAt` e o serviço registra `payment.failed` no outbox.
@@ -701,6 +782,8 @@ O serviço registra logs para:
 * pendência
 * falha definitiva
 * erro externo
+* início e fim do scheduler de retry
+* início e fim do publisher do outbox
 
 ---
 
@@ -817,6 +900,114 @@ Durante os testes do serviço, já foram validados cenários como:
 * timeout com `TimeLimiter`
 * reprocessamento de pagamentos pendentes
 * publicação de eventos a partir do outbox
+* cenário de transição `PENDING` → `APPROVED`
+* cenário de transição `PENDING` → `FAILED`
+* validação manual ponta a ponta com RabbitMQ Management UI
+
+---
+
+# 🧪 Validação Manual End-to-End via RabbitMQ
+
+## Objetivo
+
+Validar o fluxo completo:
+
+* consumo de `order.created`
+* persistência do pagamento
+* registro de idempotência
+* gravação no outbox
+* publicação do evento final no RabbitMQ
+
+## Passos
+
+### 1. Subir infraestrutura
+
+```bash
+docker compose up -d
+```
+
+### 2. Executar a aplicação
+
+```bash
+mvn spring-boot:run
+```
+
+### 3. Publicar um evento `order.created`
+
+Publique no exchange `ex.order` com routing key `order.created` um payload como:
+
+```json
+{
+  "messageId": "33333333-3333-3333-3333-333333333333",
+  "orderId": 40001,
+  "clientId": "550e8400-e29b-41d4-a716-446655440001",
+  "amount": 120.00
+}
+```
+
+### 4. Validar no PostgreSQL
+
+#### Pagamento persistido
+
+```sql
+select *
+from payments
+where order_id = 40001;
+```
+
+#### Registro de idempotência
+
+```sql
+select *
+from processed_messages
+where aggregate_key = '40001'
+order by processed_at desc;
+```
+
+#### Evento gravado no outbox
+
+```sql
+select po.*
+from payment_outbox po
+join payments p on p.id = po.aggregate_id
+where p.order_id = 40001
+order by po.created_at asc;
+```
+
+### 5. Validar publicação no RabbitMQ
+
+Verifique a fila de debug compatível com o estado final:
+
+* `payment.approved.debug`
+* `payment.pending.debug`
+* `payment.failed.debug`
+
+### 6. Resultado esperado
+
+Resultado esperado para um processamento bem-sucedido:
+
+* 1 pagamento para o `orderId`
+* 1 registro em `processed_messages` para o `messageId`
+* 1 registro coerente no outbox com status `PUBLISHED`
+* 1 mensagem publicada na fila de debug correspondente ao estado final
+
+### Observação sobre inspeção de filas
+
+Ao usar a opção **Get messages** no RabbitMQ Management UI, lembre-se de que isso pode consumir a mensagem dependendo do modo de ack selecionado.
+
+Para inspeção sem remoção definitiva, prefira modo compatível com requeue quando estiver apenas validando.
+
+---
+
+## Cenário adicional: reenvio da mesma mensagem
+
+Ao reenviar exatamente o mesmo evento `order.created` com o mesmo `messageId`:
+
+* não deve ser criado novo pagamento
+* não deve ser criado novo registro em `processed_messages`
+* não deve ser criado novo evento de outbox para aquele mesmo processamento
+
+Esse cenário valida a proteção contra duplicidade no consumo assíncrono.
 
 ---
 
@@ -945,7 +1136,36 @@ http://localhost:8083
 ### 7. Testar rapidamente a API
 
 ```bash
+curl http://localhost:8083/actuator/health
 curl http://localhost:8083/payments/order/12345
+```
+
+### 8. Observação para Windows / PowerShell
+
+No PowerShell, o uso de `curl` pode se comportar de forma diferente do `curl` tradicional por causa do alias para `Invoke-WebRequest`.
+
+Em ambientes Windows, uma alternativa estável para testes de POST JSON é usar:
+
+```powershell
+$body = @{
+  orderId = 12345
+  clientId = "550e8400-e29b-41d4-a716-446655440001"
+  amount = 120.00
+} | ConvertTo-Json
+
+Invoke-RestMethod `
+  -Method Post `
+  -Uri "http://localhost:8083/payments/process" `
+  -ContentType "application/json" `
+  -Body $body
+```
+
+Ou, se desejar usar o executável nativo do curl:
+
+```powershell
+curl.exe -X POST "http://localhost:8083/payments/process" `
+  -H "Content-Type: application/json" `
+  -d '{"orderId":12345,"clientId":"550e8400-e29b-41d4-a716-446655440001","amount":120.00}'
 ```
 
 ---
@@ -954,40 +1174,80 @@ curl http://localhost:8083/payments/order/12345
 
 ```yaml
 spring:
+  application:
+    name: ${SPRING_APPLICATION_NAME:payment-service}
+
   datasource:
-    url: jdbc:postgresql://localhost:5432/paymentdb
-    username: payment
-    password: payment
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/paymentdb}
+    username: ${SPRING_DATASOURCE_USERNAME:payment}
+    password: ${SPRING_DATASOURCE_PASSWORD:payment}
+
+  jpa:
+    hibernate:
+      ddl-auto: ${SPRING_JPA_HIBERNATE_DDL_AUTO:validate}
+    show-sql: ${SPRING_JPA_SHOW_SQL:true}
+    open-in-view: false
+
+  flyway:
+    enabled: ${SPRING_FLYWAY_ENABLED:true}
+    locations: ${SPRING_FLYWAY_LOCATIONS:classpath:db/migration}
 
   rabbitmq:
-    host: localhost
-    port: 5672
-    username: guest
-    password: guest
+    host: ${SPRING_RABBITMQ_HOST:localhost}
+    port: ${SPRING_RABBITMQ_PORT:5672}
+    username: ${SPRING_RABBITMQ_USERNAME:guest}
+    password: ${SPRING_RABBITMQ_PASSWORD:guest}
+
+resilience4j:
+  retry:
+    instances:
+      externalPaymentProcessor:
+        max-attempts: 3
+        wait-duration: 500ms
+
+  circuitbreaker:
+    instances:
+      externalPaymentProcessor:
+        sliding-window-size: 10
+        minimum-number-of-calls: 5
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 10s
+        permitted-number-of-calls-in-half-open-state: 3
+
+  timelimiter:
+    instances:
+      externalPaymentProcessor:
+        timeout-duration: 2s
+
+  bulkhead:
+    instances:
+      externalPaymentProcessor:
+        max-concurrent-calls: 5
+        max-wait-duration: 0
 
 app:
   rabbit:
     exchange:
-      order: ex.order
-      payment: ex.payment
+      order: ${APP_RABBIT_EXCHANGE_ORDER:ex.order}
+      payment: ${APP_RABBIT_EXCHANGE_PAYMENT:ex.payment}
 
     routing-key:
-      order-created: order.created
-      payment-approved: payment.approved
-      payment-pending: payment.pending
-      payment-failed: payment.failed
+      order-created: ${APP_RABBIT_ROUTING_KEY_ORDER_CREATED:order.created}
+      payment-approved: ${APP_RABBIT_ROUTING_KEY_PAYMENT_APPROVED:payment.approved}
+      payment-pending: ${APP_RABBIT_ROUTING_KEY_PAYMENT_PENDING:payment.pending}
+      payment-failed: ${APP_RABBIT_ROUTING_KEY_PAYMENT_FAILED:payment.failed}
 
     queue:
-      payment-order-created: payment.order.created
-      payment-approved-debug: payment.approved.debug
-      payment-pending-debug: payment.pending.debug
-      payment-failed-debug: payment.failed.debug
+      payment-order-created: ${APP_RABBIT_QUEUE_PAYMENT_ORDER_CREATED:payment.order.created}
+      payment-approved-debug: ${APP_RABBIT_QUEUE_PAYMENT_APPROVED_DEBUG:payment.approved.debug}
+      payment-pending-debug: ${APP_RABBIT_QUEUE_PAYMENT_PENDING_DEBUG:payment.pending.debug}
+      payment-failed-debug: ${APP_RABBIT_QUEUE_PAYMENT_FAILED_DEBUG:payment.failed.debug}
 
     dlq:
-      payment-order-created: payment.order.created.dlq
-      payment-approved-debug: payment.approved.debug.dlq
-      payment-pending-debug: payment.pending.debug.dlq
-      payment-failed-debug: payment.failed.debug.dlq
+      payment-order-created: ${APP_RABBIT_DLQ_PAYMENT_ORDER_CREATED:payment.order.created.dlq}
+      payment-approved-debug: ${APP_RABBIT_DLQ_PAYMENT_APPROVED_DEBUG:payment.approved.debug.dlq}
+      payment-pending-debug: ${APP_RABBIT_DLQ_PAYMENT_PENDING_DEBUG:payment.pending.debug.dlq}
+      payment-failed-debug: ${APP_RABBIT_DLQ_PAYMENT_FAILED_DEBUG:payment.failed.debug.dlq}
 
   payment:
     retry:
@@ -1005,14 +1265,14 @@ app:
         batch-size: 100
 
   external-payment:
-    fake-enabled: false
-    base-url: http://localhost:8089
-    request-path: /requisicao
-    connect-timeout-ms: 1000
-    read-timeout-ms: 2000
+    fake-enabled: ${APP_EXTERNAL_PAYMENT_FAKE_ENABLED:false}
+    base-url: ${APP_EXTERNAL_PAYMENT_BASE_URL:http://localhost:8089}
+    request-path: ${APP_EXTERNAL_PAYMENT_REQUEST_PATH:/requisicao}
+    connect-timeout-ms: ${APP_EXTERNAL_PAYMENT_CONNECT_TIMEOUT_MS:1000}
+    read-timeout-ms: ${APP_EXTERNAL_PAYMENT_READ_TIMEOUT_MS:2000}
 
 server:
-  port: 8083
+  port: ${SERVER_PORT:8083}
 ```
 
 ---
