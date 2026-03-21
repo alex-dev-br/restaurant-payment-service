@@ -1,0 +1,48 @@
+spring:
+    devtools:
+        restart:
+            enabled: false
+
+    main:
+        log-startup-info: false
+
+    jpa:
+        show-sql: false
+
+    datasource:
+        hikari:
+            maximum-pool-size: 4
+            minimum-idle: 0
+            idle-timeout: 10000
+            max-lifetime: 30000
+            connection-timeout: 20000
+
+    rabbitmq:
+        listener:
+            simple:
+                auto-startup: true
+
+logging:
+    level:
+        org.hibernate.SQL: WARN
+        org.hibernate.orm.jdbc.bind: WARN
+        org.springframework.test.context.support.AnnotationConfigContextLoaderUtils: WARN
+        org.springframework.boot.test.context.SpringBootTestContextBootstrapper: WARN
+        org.springframework.boot.devtools.restart.RestartApplicationListener: WARN
+        io.micrometer.core.instrument.MeterRegistry: ERROR
+
+app:
+    external-payment:
+        fake-enabled: false
+
+    payment:
+        retry:
+            scheduler:
+                enabled: false
+
+        outbox:
+            publisher:
+                enabled: true
+                fixed-delay-ms: 500
+                batch-size: 20
+
