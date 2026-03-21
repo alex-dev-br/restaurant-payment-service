@@ -23,11 +23,14 @@ class PaymentApprovedEndToEndIntegrationTest extends AbstractPaymentE2ETest {
 
     @Test
     void shouldConsumeOrderCreatedAndPublishApprovedEventEndToEnd() {
+        processorWillApprove();
+
         TestOrderData orderData = newOrderData(new BigDecimal("120.00"));
 
         sendOrderCreated(orderData);
 
         awaitPaymentPersisted(orderData.orderId());
+        awaitPaymentStatus(orderData.orderId(), "APPROVED");
 
         Map<String, Object> paymentRow = findPaymentRow(orderData.orderId());
 
@@ -39,7 +42,8 @@ class PaymentApprovedEndToEndIntegrationTest extends AbstractPaymentE2ETest {
 
         assertThat(countProcessedMessages(orderData.messageId())).isEqualTo(1);
 
-        Map<String, Object> outboxRow = awaitLatestOutboxRowForOrder(orderData.orderId());
+        Map<String, Object> outboxRow =
+                awaitOutboxRowForOrderAndEventType(orderData.orderId(), "PAYMENT_APPROVED");
 
         assertThat(outboxRow.get("event_type")).isEqualTo("PAYMENT_APPROVED");
         assertThat(outboxRow.get("routing_key")).isEqualTo("payment.approved");

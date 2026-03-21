@@ -1,12 +1,16 @@
 package br.com.fiap.restaurant.payment.infra.messaging.e2e;
 
+import br.com.fiap.restaurant.payment.core.usecase.RetryPendingPaymentsUseCase;
 import br.com.fiap.restaurant.payment.infra.messaging.inbound.dto.OrderCreatedMessage;
 import org.awaitility.Awaitility;
 import org.springframework.amqp.core.Message;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.resttestclient.TestRestTemplate;
+import org.springframework.boot.resttestclient.autoconfigure.AutoConfigureTestRestTemplate;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 
@@ -21,14 +25,16 @@ import java.util.concurrent.ThreadLocalRandom;
         webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
         properties = {
                 "spring.rabbitmq.listener.simple.auto-startup=true",
-                "app.external-payment.fake-enabled=true",
                 "app.payment.retry.scheduler.enabled=false",
+                "app.payment.retry.scheduler.fixed-delay-ms=0",
                 "app.payment.outbox.publisher.enabled=true",
                 "app.payment.outbox.publisher.fixed-delay-ms=500",
                 "spring.jpa.show-sql=false"
         }
 )
 @ActiveProfiles("test")
+@AutoConfigureTestRestTemplate
+@Import(ControlledExternalPaymentProcessorTestConfig.class)
 public abstract class AbstractPaymentE2ETest {
 
     protected static final Duration DEFAULT_TIMEOUT = Duration.ofSeconds(15);
@@ -58,6 +64,16 @@ public abstract class AbstractPaymentE2ETest {
     @Autowired
     protected JdbcTemplate jdbcTemplate;
 
+    @Autowired
+    protected TestRestTemplate restTemplate;
+
+    @Autowired
+    protected RetryPendingPaymentsUseCase retryPendingPaymentsUseCase;
+
+    @Autowired
+    protected ControlledExternalPaymentProcessorTestConfig.ControlledExternalPaymentProcessorClient
+            controlledExternalPaymentProcessorClient;
+
     protected TestOrderData newOrderData(BigDecimal amount) {
         return new TestOrderData(
                 UUID.randomUUID(),
@@ -84,6 +100,22 @@ public abstract class AbstractPaymentE2ETest {
         );
     }
 
+    protected void processorWillApprove() {
+        controlledExternalPaymentProcessorClient.enqueueApproved();
+    }
+
+    protected void processorWillReturnPending() {
+        controlledExternalPaymentProcessorClient.enqueuePending();
+    }
+
+    protected void processorWillThrow(String message) {
+        controlledExternalPaymentProcessorClient.enqueueFailure(new RuntimeException(message));
+    }
+
+    protected void triggerRetryCycle() {
+        retryPendingPaymentsUseCase.execute();
+    }
+
     protected void awaitPaymentPersisted(long orderId) {
         Awaitility.await()
                 .atMost(DEFAULT_TIMEOUT)
@@ -95,6 +127,35 @@ public abstract class AbstractPaymentE2ETest {
                             orderId
                     );
                     org.assertj.core.api.Assertions.assertThat(paymentsCount).isEqualTo(1);
+                });
+    }
+
+    protected void awaitPaymentStatus(long orderId, String expectedStatus) {
+        Awaitility.await()
+                .atMost(DEFAULT_TIMEOUT)
+                .pollInterval(DEFAULT_POLL_INTERVAL)
+                .untilAsserted(() -> {
+                    String currentStatus = jdbcTemplate.queryForObject(
+                            "select status from payments where order_id = ?",
+                            String.class,
+                            orderId
+                    );
+                    org.assertj.core.api.Assertions.assertThat(currentStatus).isEqualTo(expectedStatus);
+                });
+    }
+
+    protected void awaitRetryCount(long orderId, int expectedRetryCount) {
+        Awaitility.await()
+                .atMost(DEFAULT_TIMEOUT)
+                .pollInterval(DEFAULT_POLL_INTERVAL)
+                .untilAsserted(() -> {
+                    Integer currentRetryCount = jdbcTemplate.queryForObject(
+                            "select retry_count from payments where order_id = ?",
+                            Integer.class,
+                            orderId
+                    );
+                    org.assertj.core.api.Assertions.assertThat(currentRetryCount)
+                            .isEqualTo(expectedRetryCount);
                 });
     }
 
@@ -154,6 +215,37 @@ public abstract class AbstractPaymentE2ETest {
         return holder[0];
     }
 
+    protected Map<String, Object> awaitOutboxRowForOrderAndEventType(long orderId, String eventType) {
+        final Map<String, Object>[] holder = new Map[1];
+
+        Awaitility.await()
+                .atMost(DEFAULT_TIMEOUT)
+                .pollInterval(DEFAULT_POLL_INTERVAL)
+                .untilAsserted(() -> {
+                    holder[0] = jdbcTemplate.queryForMap("""
+                            select
+                                id,
+                                aggregate_id,
+                                event_type,
+                                exchange_name,
+                                routing_key,
+                                status,
+                                payload,
+                                created_at,
+                                published_at
+                            from payment_outbox
+                            where payload like ?
+                              and event_type = ?
+                            order by created_at desc
+                            fetch first 1 row only
+                            """, "%" + orderId + "%", eventType);
+
+                    org.assertj.core.api.Assertions.assertThat(holder[0]).isNotNull();
+                });
+
+        return holder[0];
+    }
+
     protected Message awaitMessage(String queueName) {
         final Message[] holder = new Message[1];
 
@@ -198,6 +290,7 @@ public abstract class AbstractPaymentE2ETest {
     }
 
     protected void resetState() {
+        controlledExternalPaymentProcessorClient.reset();
         purgeQueues();
         cleanDatabase();
     }
