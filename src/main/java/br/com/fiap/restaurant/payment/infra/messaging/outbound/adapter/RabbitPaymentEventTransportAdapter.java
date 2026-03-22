@@ -2,6 +2,7 @@ package br.com.fiap.restaurant.payment.infra.messaging.outbound.adapter;
 
 import br.com.fiap.restaurant.payment.core.domain.model.PaymentOutboxEvent;
 import br.com.fiap.restaurant.payment.core.gateway.PaymentEventTransportGateway;
+import br.com.fiap.restaurant.payment.infra.messaging.dto.EventDTO;
 import br.com.fiap.restaurant.payment.infra.messaging.outbound.dto.PaymentEventMessage;
 import br.com.fiap.restaurant.payment.infra.messaging.outbound.producer.PaymentEventRabbitProducer;
 import org.springframework.stereotype.Component;
@@ -31,7 +32,7 @@ public class RabbitPaymentEventTransportAdapter implements PaymentEventTransport
             paymentEventRabbitProducer.send(
                     event.getExchangeName(),
                     event.getRoutingKey(),
-                    message
+                    new EventDTO<>(event.getRoutingKey(), message)
             );
         } catch (JacksonException exception) {
             throw new IllegalStateException("Erro ao desserializar payload do outbox", exception);

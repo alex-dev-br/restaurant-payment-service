@@ -54,7 +54,9 @@ app:
   rabbit:
     exchange:
       order: ${APP_RABBIT_EXCHANGE_ORDER:ex.order}
+      order-dl: ${APP_RABBIT_EXCHANGE_ORDER_DL:ex.order.dlx}
       payment: ${APP_RABBIT_EXCHANGE_PAYMENT:ex.payment}
+      payment-dl: ${APP_RABBIT_EXCHANGE_PAYMENT_DL:ex.payment.dlx}
 
     routing-key:
       order-created: ${APP_RABBIT_ROUTING_KEY_ORDER_CREATED:order.created}

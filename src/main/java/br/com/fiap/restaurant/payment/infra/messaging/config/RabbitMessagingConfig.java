@@ -1,11 +1,6 @@
 package br.com.fiap.restaurant.payment.infra.messaging.config;
 
-import org.springframework.amqp.core.Binding;
-import org.springframework.amqp.core.BindingBuilder;
-import org.springframework.amqp.core.DirectExchange;
-import org.springframework.amqp.core.MessageDeliveryMode;
-import org.springframework.amqp.core.Queue;
-import org.springframework.amqp.core.QueueBuilder;
+import org.springframework.amqp.core.*;
 import org.springframework.amqp.rabbit.connection.ConnectionFactory;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.amqp.support.converter.JacksonJsonMessageConverter;
@@ -13,6 +8,7 @@ import org.springframework.amqp.support.converter.MessageConverter;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+
 
 @Configuration
 @EnableConfigurationProperties(RabbitProperties.class)
@@ -51,8 +47,9 @@ public class RabbitMessagingConfig {
     public Queue paymentOrderCreatedQueue(RabbitProperties properties) {
         return QueueBuilder
                 .durable(properties.getQueue().getPaymentOrderCreated())
-                .deadLetterExchange(properties.getExchange().getOrder())
-                .deadLetterRoutingKey(properties.getDlq().getPaymentOrderCreated())
+                .quorum()
+                .deadLetterExchange(properties.getExchange().getOrderDl())
+                .deadLetterRoutingKey(properties.getQueue().getPaymentOrderCreated())
                 .build();
     }
 
@@ -60,6 +57,7 @@ public class RabbitMessagingConfig {
     public Queue paymentOrderCreatedDlq(RabbitProperties properties) {
         return QueueBuilder
                 .durable(properties.getDlq().getPaymentOrderCreated())
+                .quorum()
                 .build();
     }
 
@@ -84,15 +82,16 @@ public class RabbitMessagingConfig {
         return BindingBuilder
                 .bind(paymentOrderCreatedDlq)
                 .to(orderExchange)
-                .with(properties.getDlq().getPaymentOrderCreated());
+                .with(properties.getQueue().getPaymentOrderCreated());
     }
 
     @Bean
     public Queue paymentApprovedDebugQueue(RabbitProperties properties) {
         return QueueBuilder
                 .durable(properties.getQueue().getPaymentApprovedDebug())
-                .deadLetterExchange(properties.getExchange().getPayment())
-                .deadLetterRoutingKey(properties.getDlq().getPaymentApprovedDebug())
+                .quorum()
+                .deadLetterExchange(properties.getExchange().getPaymentDl())
+                .deadLetterRoutingKey(properties.getQueue().getPaymentApprovedDebug())
                 .build();
     }
 
@@ -100,6 +99,7 @@ public class RabbitMessagingConfig {
     public Queue paymentApprovedDebugDlq(RabbitProperties properties) {
         return QueueBuilder
                 .durable(properties.getDlq().getPaymentApprovedDebug())
+                .quorum()
                 .build();
     }
 
@@ -124,15 +124,16 @@ public class RabbitMessagingConfig {
         return BindingBuilder
                 .bind(paymentApprovedDebugDlq)
                 .to(paymentExchange)
-                .with(properties.getDlq().getPaymentApprovedDebug());
+                .with(properties.getQueue().getPaymentApprovedDebug());
     }
 
     @Bean
     public Queue paymentPendingDebugQueue(RabbitProperties properties) {
         return QueueBuilder
                 .durable(properties.getQueue().getPaymentPendingDebug())
-                .deadLetterExchange(properties.getExchange().getPayment())
-                .deadLetterRoutingKey(properties.getDlq().getPaymentPendingDebug())
+                .quorum()
+                .deadLetterExchange(properties.getExchange().getPaymentDl())
+                .deadLetterRoutingKey(properties.getQueue().getPaymentPendingDebug())
                 .build();
     }
 
@@ -140,6 +141,7 @@ public class RabbitMessagingConfig {
     public Queue paymentPendingDebugDlq(RabbitProperties properties) {
         return QueueBuilder
                 .durable(properties.getDlq().getPaymentPendingDebug())
+                .quorum()
                 .build();
     }
 
@@ -164,15 +166,16 @@ public class RabbitMessagingConfig {
         return BindingBuilder
                 .bind(paymentPendingDebugDlq)
                 .to(paymentExchange)
-                .with(properties.getDlq().getPaymentPendingDebug());
+                .with(properties.getQueue().getPaymentPendingDebug());
     }
 
     @Bean
     public Queue paymentFailedDebugQueue(RabbitProperties properties) {
         return QueueBuilder
                 .durable(properties.getQueue().getPaymentFailedDebug())
-                .deadLetterExchange(properties.getExchange().getPayment())
-                .deadLetterRoutingKey(properties.getDlq().getPaymentFailedDebug())
+                .quorum()
+                .deadLetterExchange(properties.getExchange().getPaymentDl())
+                .deadLetterRoutingKey(properties.getQueue().getPaymentFailedDebug())
                 .build();
     }
 
@@ -180,6 +183,7 @@ public class RabbitMessagingConfig {
     public Queue paymentFailedDebugDlq(RabbitProperties properties) {
         return QueueBuilder
                 .durable(properties.getDlq().getPaymentFailedDebug())
+                .quorum()
                 .build();
     }
 
@@ -204,6 +208,6 @@ public class RabbitMessagingConfig {
         return BindingBuilder
                 .bind(paymentFailedDebugDlq)
                 .to(paymentExchange)
-                .with(properties.getDlq().getPaymentFailedDebug());
+                .with(properties.getQueue().getPaymentFailedDebug());
     }
 }
