@@ -1,6 +1,7 @@
 package br.com.fiap.restaurant.payment.infra.persistence.adapter;
 
 import br.com.fiap.restaurant.payment.infra.persistence.repository.SpringDataProcessedMessageRepository;
+import br.com.fiap.restaurant.payment.support.AbstractPostgresIntegrationTest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
@@ -18,7 +19,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @ActiveProfiles("test")
 @Import(ProcessedMessagePersistenceAdapter.class)
 @AutoConfigureTestDatabase(replace = Replace.NONE)
-class ProcessedMessagePersistenceAdapterTest {
+class ProcessedMessagePersistenceAdapterTest extends AbstractPostgresIntegrationTest {
 
     @org.springframework.beans.factory.annotation.Autowired
     private ProcessedMessagePersistenceAdapter adapter;

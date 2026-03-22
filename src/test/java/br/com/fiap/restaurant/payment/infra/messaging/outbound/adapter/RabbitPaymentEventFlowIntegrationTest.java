@@ -9,9 +9,11 @@ import br.com.fiap.restaurant.payment.core.usecase.PublishPendingPaymentOutboxUs
 import br.com.fiap.restaurant.payment.core.usecase.RetryPendingPaymentsUseCase;
 import br.com.fiap.restaurant.payment.core.usecase.command.ProcessPaymentCommand;
 import br.com.fiap.restaurant.payment.infra.messaging.config.RabbitProperties;
+import br.com.fiap.restaurant.payment.infra.messaging.dto.EventDTO;
 import br.com.fiap.restaurant.payment.infra.messaging.outbound.dto.PaymentEventMessage;
 import br.com.fiap.restaurant.payment.infra.persistence.repository.SpringDataPaymentOutboxRepository;
 import br.com.fiap.restaurant.payment.infra.persistence.repository.SpringDataPaymentRepository;
+import br.com.fiap.restaurant.payment.support.AbstractMessagingIntegrationTest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.amqp.core.AmqpAdmin;
@@ -23,6 +25,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
+import java.util.Map;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -37,7 +40,7 @@ import static org.mockito.Mockito.when;
         "app.payment.outbox.publisher.enabled=false"
 })
 @ActiveProfiles("test")
-class RabbitPaymentEventFlowIntegrationTest {
+class RabbitPaymentEventFlowIntegrationTest extends AbstractMessagingIntegrationTest {
 
     @Autowired
     private ProcessPaymentUseCase processPaymentUseCase;
@@ -96,24 +99,21 @@ class RabbitPaymentEventFlowIntegrationTest {
         processPaymentUseCase.execute(command);
         publishPendingPaymentOutboxUseCase.execute();
 
-        PaymentEventMessage approvedMessage = receiveExpectedMessage(
-                rabbitProperties.getQueue().getPaymentApprovedDebug(),
-                PaymentEventMessage.class
+        EventDTO<?> approvedEvent = receiveExpectedEvent(
+                rabbitProperties.getQueue().getPaymentApprovedDebug()
         );
 
-        assertPaymentEvent(approvedMessage, orderId, clientId, amount, "APPROVED");
+        assertPaymentEvent(approvedEvent, "payment.approved", orderId, clientId, amount, "APPROVED");
 
-        PaymentEventMessage pendingMessage = receiveUnexpectedMessage(
-                rabbitProperties.getQueue().getPaymentPendingDebug(),
-                PaymentEventMessage.class
+        EventDTO<?> pendingEvent = receiveUnexpectedEvent(
+                rabbitProperties.getQueue().getPaymentPendingDebug()
         );
-        PaymentEventMessage failedMessage = receiveUnexpectedMessage(
-                rabbitProperties.getQueue().getPaymentFailedDebug(),
-                PaymentEventMessage.class
+        EventDTO<?> failedEvent = receiveUnexpectedEvent(
+                rabbitProperties.getQueue().getPaymentFailedDebug()
         );
 
-        assertNull(pendingMessage);
-        assertNull(failedMessage);
+        assertNull(pendingEvent);
+        assertNull(failedEvent);
     }
 
     @Test
@@ -132,24 +132,21 @@ class RabbitPaymentEventFlowIntegrationTest {
         processPaymentUseCase.execute(command);
         publishPendingPaymentOutboxUseCase.execute();
 
-        PaymentEventMessage pendingMessage = receiveExpectedMessage(
-                rabbitProperties.getQueue().getPaymentPendingDebug(),
-                PaymentEventMessage.class
+        EventDTO<?> pendingEvent = receiveExpectedEvent(
+                rabbitProperties.getQueue().getPaymentPendingDebug()
         );
 
-        assertPaymentEvent(pendingMessage, orderId, clientId, amount, "PENDING");
+        assertPaymentEvent(pendingEvent, "payment.pending", orderId, clientId, amount, "PENDING");
 
-        PaymentEventMessage approvedMessage = receiveUnexpectedMessage(
-                rabbitProperties.getQueue().getPaymentApprovedDebug(),
-                PaymentEventMessage.class
+        EventDTO<?> approvedEvent = receiveUnexpectedEvent(
+                rabbitProperties.getQueue().getPaymentApprovedDebug()
         );
-        PaymentEventMessage failedMessage = receiveUnexpectedMessage(
-                rabbitProperties.getQueue().getPaymentFailedDebug(),
-                PaymentEventMessage.class
+        EventDTO<?> failedEvent = receiveUnexpectedEvent(
+                rabbitProperties.getQueue().getPaymentFailedDebug()
         );
 
-        assertNull(approvedMessage);
-        assertNull(failedMessage);
+        assertNull(approvedEvent);
+        assertNull(failedEvent);
     }
 
     @Test
@@ -170,24 +167,21 @@ class RabbitPaymentEventFlowIntegrationTest {
         processPaymentUseCase.execute(command);
         publishPendingPaymentOutboxUseCase.execute();
 
-        PaymentEventMessage pendingMessage = receiveExpectedMessage(
-                rabbitProperties.getQueue().getPaymentPendingDebug(),
-                PaymentEventMessage.class
+        EventDTO<?> pendingEvent = receiveExpectedEvent(
+                rabbitProperties.getQueue().getPaymentPendingDebug()
         );
 
-        assertPaymentEvent(pendingMessage, orderId, clientId, amount, "PENDING");
+        assertPaymentEvent(pendingEvent, "payment.pending", orderId, clientId, amount, "PENDING");
 
-        PaymentEventMessage approvedMessage = receiveUnexpectedMessage(
-                rabbitProperties.getQueue().getPaymentApprovedDebug(),
-                PaymentEventMessage.class
+        EventDTO<?> approvedEvent = receiveUnexpectedEvent(
+                rabbitProperties.getQueue().getPaymentApprovedDebug()
         );
-        PaymentEventMessage failedMessage = receiveUnexpectedMessage(
-                rabbitProperties.getQueue().getPaymentFailedDebug(),
-                PaymentEventMessage.class
+        EventDTO<?> failedEvent = receiveUnexpectedEvent(
+                rabbitProperties.getQueue().getPaymentFailedDebug()
         );
 
-        assertNull(approvedMessage);
-        assertNull(failedMessage);
+        assertNull(approvedEvent);
+        assertNull(failedEvent);
     }
 
     @Test
@@ -220,24 +214,21 @@ class RabbitPaymentEventFlowIntegrationTest {
         retryPendingPaymentsUseCase.execute();
         publishPendingPaymentOutboxUseCase.execute();
 
-        PaymentEventMessage failedMessage = receiveExpectedMessage(
-                rabbitProperties.getQueue().getPaymentFailedDebug(),
-                PaymentEventMessage.class
+        EventDTO<?> failedEvent = receiveExpectedEvent(
+                rabbitProperties.getQueue().getPaymentFailedDebug()
         );
 
-        assertPaymentEvent(failedMessage, orderId, clientId, amount, "FAILED");
+        assertPaymentEvent(failedEvent, "payment.failed", orderId, clientId, amount, "FAILED");
 
-        PaymentEventMessage approvedMessage = receiveUnexpectedMessage(
-                rabbitProperties.getQueue().getPaymentApprovedDebug(),
-                PaymentEventMessage.class
+        EventDTO<?> approvedEvent = receiveUnexpectedEvent(
+                rabbitProperties.getQueue().getPaymentApprovedDebug()
         );
-        PaymentEventMessage pendingMessage = receiveUnexpectedMessage(
-                rabbitProperties.getQueue().getPaymentPendingDebug(),
-                PaymentEventMessage.class
+        EventDTO<?> pendingEvent = receiveUnexpectedEvent(
+                rabbitProperties.getQueue().getPaymentPendingDebug()
         );
 
-        assertNull(approvedMessage);
-        assertNull(pendingMessage);
+        assertNull(approvedEvent);
+        assertNull(pendingEvent);
     }
 
     private Long nextOrderId() {
@@ -245,47 +236,101 @@ class RabbitPaymentEventFlowIntegrationTest {
     }
 
     private void assertPaymentEvent(
-            PaymentEventMessage message,
+            EventDTO<?> event,
+            String expectedType,
             Long expectedOrderId,
             UUID expectedClientId,
             BigDecimal expectedAmount,
             String expectedStatus
     ) {
-        assertNotNull(message);
+        assertNotNull(event);
+        assertNotNull(event.uuid());
+        assertEquals(expectedType, event.type());
+        assertNotNull(event.createTimeStamp());
+
+        PaymentEventMessage message = toPaymentEventMessage(event.body());
+
         assertNotNull(message.paymentId());
         assertEquals(expectedOrderId, message.orderId());
         assertEquals(expectedClientId, message.clientId());
-        assertEquals(expectedAmount, message.amount());
+        assertEquals(0, expectedAmount.compareTo(message.amount()));
         assertEquals(expectedStatus, message.status());
         assertNotNull(message.occurredAt());
+    }
+
+    private PaymentEventMessage toPaymentEventMessage(Object body) {
+        assertNotNull(body, "Body do evento não pode ser nulo");
+
+        if (body instanceof PaymentEventMessage paymentEventMessage) {
+            return paymentEventMessage;
+        }
+
+        assertTrue(
+                body instanceof Map<?, ?>,
+                "Body do evento com tipo inesperado: " + body.getClass().getName()
+        );
+
+        Map<?, ?> map = (Map<?, ?>) body;
+
+        return new PaymentEventMessage(
+                UUID.fromString(requiredString(map, "paymentId")),
+                requiredLong(map, "orderId"),
+                UUID.fromString(requiredString(map, "clientId")),
+                requiredBigDecimal(map, "amount"),
+                requiredString(map, "status"),
+                OffsetDateTime.parse(requiredString(map, "occurredAt"))
+        );
+    }
+
+    private String requiredString(Map<?, ?> map, String key) {
+        Object value = map.get(key);
+        assertNotNull(value, "Campo ausente no body do evento: " + key);
+        return value.toString();
+    }
+
+    private Long requiredLong(Map<?, ?> map, String key) {
+        Object value = map.get(key);
+        assertNotNull(value, "Campo ausente no body do evento: " + key);
+
+        if (value instanceof Number number) {
+            return number.longValue();
+        }
+
+        return Long.parseLong(value.toString());
+    }
+
+    private BigDecimal requiredBigDecimal(Map<?, ?> map, String key) {
+        Object value = map.get(key);
+        assertNotNull(value, "Campo ausente no body do evento: " + key);
+        return new BigDecimal(value.toString());
     }
 
     private void purgeQueue(String queueName) {
         amqpAdmin.purgeQueue(queueName, true);
     }
 
-    private <T> T receiveExpectedMessage(String queueName, Class<T> payloadType) {
+    private EventDTO<?> receiveExpectedEvent(String queueName) {
         Object message = rabbitTemplate.receiveAndConvert(queueName, 5000);
 
         assertNotNull(message, "Nenhuma mensagem recebida da fila " + queueName);
         assertTrue(
-                payloadType.isInstance(message),
+                message instanceof EventDTO<?>,
                 "Mensagem recebida da fila " + queueName + " com tipo inesperado: "
                         + message.getClass().getName()
         );
 
-        return payloadType.cast(message);
+        return (EventDTO<?>) message;
     }
 
-    private <T> T receiveUnexpectedMessage(String queueName, Class<T> payloadType) {
+    private EventDTO<?> receiveUnexpectedEvent(String queueName) {
         Object message = rabbitTemplate.receiveAndConvert(queueName, 100);
 
         assertTrue(
-                message == null || payloadType.isInstance(message),
+                message == null || message instanceof EventDTO<?>,
                 "Mensagem recebida da fila " + queueName + " com tipo inesperado: "
                         + (message == null ? "null" : message.getClass().getName())
         );
 
-        return message == null ? null : payloadType.cast(message);
+        return message == null ? null : (EventDTO<?>) message;
     }
 }

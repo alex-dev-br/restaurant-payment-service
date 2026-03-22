@@ -1,7 +1,10 @@
 package br.com.fiap.restaurant.payment.infra.messaging.e2e;
 
 import br.com.fiap.restaurant.payment.core.usecase.RetryPendingPaymentsUseCase;
-import br.com.fiap.restaurant.payment.infra.messaging.inbound.dto.OrderCreatedMessage;
+import br.com.fiap.restaurant.payment.infra.messaging.dto.EventDTO;
+import br.com.fiap.restaurant.payment.infra.messaging.inbound.dto.OrderDTO;
+import br.com.fiap.restaurant.payment.infra.messaging.inbound.dto.OrderItemDTO;
+import br.com.fiap.restaurant.payment.support.AbstractMessagingIntegrationTest;
 import org.awaitility.Awaitility;
 import org.springframework.amqp.core.Message;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
@@ -17,6 +20,8 @@ import org.springframework.test.context.ActiveProfiles;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
@@ -35,7 +40,7 @@ import java.util.concurrent.ThreadLocalRandom;
 @ActiveProfiles("test")
 @AutoConfigureTestRestTemplate
 @Import(ControlledExternalPaymentProcessorTestConfig.class)
-public abstract class AbstractPaymentE2ETest {
+public abstract class AbstractPaymentE2ETest extends AbstractMessagingIntegrationTest {
 
     protected static final Duration DEFAULT_TIMEOUT = Duration.ofSeconds(15);
     protected static final Duration DEFAULT_POLL_INTERVAL = Duration.ofMillis(250);
@@ -83,12 +88,18 @@ public abstract class AbstractPaymentE2ETest {
         );
     }
 
-    protected OrderCreatedMessage buildOrderCreatedMessage(TestOrderData orderData) {
-        return new OrderCreatedMessage(
-                orderData.messageId(),
+    protected EventDTO<OrderDTO> buildOrderCreatedMessage(TestOrderData orderData) {
+        OrderDTO body = new OrderDTO(
                 orderData.orderId(),
                 orderData.clientId(),
-                orderData.amount()
+                List.of(new OrderItemDTO(BigDecimal.ONE, orderData.amount()))
+        );
+
+        return new EventDTO<>(
+                orderData.messageId(),
+                "ORDER_CREATED",
+                LocalDateTime.now(),
+                body
         );
     }
 

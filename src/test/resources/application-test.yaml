@@ -21,7 +21,7 @@ spring:
     rabbitmq:
         listener:
             simple:
-                auto-startup: true
+                auto-startup: false
 
 logging:
     level:

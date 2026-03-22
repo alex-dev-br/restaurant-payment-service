@@ -1,10 +1,12 @@
 package br.com.fiap.restaurant.payment.infra.messaging.inbound.consumer;
 
-import br.com.fiap.restaurant.payment.core.gateway.ProcessedMessageRepositoryGateway;
-import br.com.fiap.restaurant.payment.core.usecase.ProcessPaymentUseCase;
-import br.com.fiap.restaurant.payment.core.usecase.command.ProcessPaymentCommand;
+import br.com.fiap.restaurant.payment.core.usecase.HandleOrderCreatedEventUseCase;
+import br.com.fiap.restaurant.payment.core.usecase.command.HandleOrderCreatedEventCommand;
 import br.com.fiap.restaurant.payment.infra.messaging.config.RabbitProperties;
-import br.com.fiap.restaurant.payment.infra.messaging.inbound.dto.OrderCreatedMessage;
+import br.com.fiap.restaurant.payment.infra.messaging.dto.EventDTO;
+import br.com.fiap.restaurant.payment.infra.messaging.inbound.dto.OrderDTO;
+import br.com.fiap.restaurant.payment.infra.messaging.inbound.dto.OrderItemDTO;
+import br.com.fiap.restaurant.payment.support.AbstractMessagingIntegrationTest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -17,14 +19,14 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.util.List;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
 
 @SpringBootTest(properties = {
         "spring.rabbitmq.listener.simple.auto-startup=true",
@@ -34,7 +36,7 @@ import static org.mockito.Mockito.when;
 })
 @ActiveProfiles("test")
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
-class OrderCreatedConsumerIntegrationTest {
+class OrderCreatedConsumerIntegrationTest extends AbstractMessagingIntegrationTest {
 
     @Autowired
     private RabbitTemplate rabbitTemplate;
@@ -46,56 +48,48 @@ class OrderCreatedConsumerIntegrationTest {
     private AmqpAdmin amqpAdmin;
 
     @MockitoBean
-    private ProcessPaymentUseCase processPaymentUseCase;
-
-    @MockitoBean
-    private ProcessedMessageRepositoryGateway processedMessageRepositoryGateway;
+    private HandleOrderCreatedEventUseCase handleOrderCreatedEventUseCase;
 
     @BeforeEach
     void setUp() {
-        reset(processPaymentUseCase, processedMessageRepositoryGateway);
-
-        when(processedMessageRepositoryGateway.registerIfAbsent(
-                org.mockito.ArgumentMatchers.any(UUID.class),
-                org.mockito.ArgumentMatchers.eq("ORDER_CREATED"),
-                org.mockito.ArgumentMatchers.anyString()
-        )).thenReturn(true);
-
-        assertNotNull(rabbitProperties.getExchange());
-        assertNotNull(rabbitProperties.getRoutingKey());
-        assertNotNull(rabbitProperties.getQueue());
-        assertNotNull(rabbitProperties.getQueue().getPaymentOrderCreated());
-
+        reset(handleOrderCreatedEventUseCase);
         purgeQueue(rabbitProperties.getQueue().getPaymentOrderCreated());
     }
 
     @Test
-    void shouldConsumeOrderCreatedMessageAndInvokeProcessPaymentUseCase() {
+    void shouldConsumeOrderCreatedEventAndInvokeHandleOrderCreatedEventUseCase() {
         UUID messageId = UUID.randomUUID();
         Long orderId = 1L;
         UUID clientId = UUID.randomUUID();
         BigDecimal amount = new BigDecimal("120.00");
 
-        OrderCreatedMessage message = new OrderCreatedMessage(
-                messageId,
+        OrderDTO order = new OrderDTO(
                 orderId,
                 clientId,
-                amount
+                List.of(new OrderItemDTO(BigDecimal.ONE, amount))
+        );
+
+        EventDTO<OrderDTO> event = new EventDTO<>(
+                messageId,
+                "ORDER_CREATED",
+                LocalDateTime.now(),
+                order
         );
 
         rabbitTemplate.convertAndSend(
                 rabbitProperties.getExchange().getOrder(),
                 rabbitProperties.getRoutingKey().getOrderCreated(),
-                message
+                event
         );
 
-        ArgumentCaptor<ProcessPaymentCommand> commandCaptor =
-                ArgumentCaptor.forClass(ProcessPaymentCommand.class);
+        ArgumentCaptor<HandleOrderCreatedEventCommand> commandCaptor =
+                ArgumentCaptor.forClass(HandleOrderCreatedEventCommand.class);
 
-        verify(processPaymentUseCase, timeout(10000)).execute(commandCaptor.capture());
+        verify(handleOrderCreatedEventUseCase, timeout(10000)).execute(commandCaptor.capture());
 
-        ProcessPaymentCommand capturedCommand = commandCaptor.getValue();
+        HandleOrderCreatedEventCommand capturedCommand = commandCaptor.getValue();
 
+        assertEquals(messageId, capturedCommand.messageId());
         assertEquals(orderId, capturedCommand.orderId());
         assertEquals(clientId, capturedCommand.clientId());
         assertEquals(amount, capturedCommand.amount());

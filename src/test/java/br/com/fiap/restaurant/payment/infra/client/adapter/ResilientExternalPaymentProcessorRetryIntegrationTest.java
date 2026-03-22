@@ -1,6 +1,7 @@
 package br.com.fiap.restaurant.payment.infra.client.adapter;
 
 import br.com.fiap.restaurant.payment.infra.client.processor.ExternalPaymentProcessorClient;
+import br.com.fiap.restaurant.payment.support.AbstractMessagingIntegrationTest;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -21,7 +22,7 @@ import static org.mockito.Mockito.when;
         "app.payment.retry.scheduler.enabled=false"
 })
 @ActiveProfiles("test")
-class ResilientExternalPaymentProcessorRetryIntegrationTest {
+class ResilientExternalPaymentProcessorRetryIntegrationTest extends AbstractMessagingIntegrationTest {
 
     @Autowired
     private ResilientExternalPaymentProcessorGateway gateway;

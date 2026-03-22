@@ -3,6 +3,7 @@ package br.com.fiap.restaurant.payment.infra.persistence.adapter;
 import br.com.fiap.restaurant.payment.core.domain.model.Payment;
 import br.com.fiap.restaurant.payment.core.domain.model.PaymentStatus;
 import br.com.fiap.restaurant.payment.infra.persistence.repository.SpringDataPaymentRepository;
+import br.com.fiap.restaurant.payment.support.AbstractPostgresIntegrationTest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -20,7 +21,7 @@ import static org.junit.jupiter.api.Assertions.*;
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @ActiveProfiles("test")
-class PaymentRepositoryAdapterTest {
+class PaymentRepositoryAdapterTest extends AbstractPostgresIntegrationTest {
 
     @Autowired
     private SpringDataPaymentRepository springDataPaymentRepository;
@@ -39,7 +40,7 @@ class PaymentRepositoryAdapterTest {
                         new PaymentPersistenceMapper()
                 );
 
-        Long orderId = System.nanoTime(); // evita colisão
+        Long orderId = System.nanoTime();
         UUID clientId = UUID.randomUUID();
 
         OffsetDateTime now = OffsetDateTime.now();

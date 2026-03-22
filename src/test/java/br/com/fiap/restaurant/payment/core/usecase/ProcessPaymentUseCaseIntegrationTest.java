@@ -12,6 +12,7 @@ import br.com.fiap.restaurant.payment.infra.persistence.adapter.PaymentPersisten
 import br.com.fiap.restaurant.payment.infra.persistence.adapter.PaymentRepositoryAdapter;
 import br.com.fiap.restaurant.payment.infra.persistence.repository.SpringDataPaymentOutboxRepository;
 import br.com.fiap.restaurant.payment.infra.persistence.repository.SpringDataPaymentRepository;
+import br.com.fiap.restaurant.payment.support.AbstractPostgresIntegrationTest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -38,7 +39,7 @@ import static org.mockito.Mockito.*;
         PaymentFinalizationAdapter.class,
         PaymentOutboxPersistenceMapper.class
 })
-class ProcessPaymentUseCaseIntegrationTest {
+class ProcessPaymentUseCaseIntegrationTest extends AbstractPostgresIntegrationTest {
 
     @Autowired
     private ProcessPaymentUseCase processPaymentUseCase;
