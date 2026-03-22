@@ -3,6 +3,7 @@ package br.com.fiap.restaurant.payment.infra.messaging.outbound.adapter;
 import br.com.fiap.restaurant.payment.core.domain.model.Payment;
 import br.com.fiap.restaurant.payment.core.gateway.PaymentEventPublisherGateway;
 import br.com.fiap.restaurant.payment.infra.messaging.config.RabbitProperties;
+import br.com.fiap.restaurant.payment.infra.messaging.dto.EventDTO;
 import br.com.fiap.restaurant.payment.infra.messaging.outbound.dto.PaymentEventMessage;
 import br.com.fiap.restaurant.payment.infra.messaging.outbound.producer.PaymentEventRabbitProducer;
 import org.springframework.context.annotation.Primary;
@@ -14,6 +15,9 @@ import java.time.OffsetDateTime;
 @Primary
 public class RabbitPaymentEventPublisherAdapter implements PaymentEventPublisherGateway {
 
+    public static final String PAYMENT_APPROVED_EVENT_TYPE = "payment.approved";
+    public static final String PAYMENT_PENDING_EVENT_TYPE = "payment.pending";
+    public static final String PAYMENT_FAILED_EVENT_TYPE = "payment.failed";
     private final PaymentEventRabbitProducer paymentEventRabbitProducer;
     private final RabbitProperties rabbitProperties;
 
@@ -30,7 +34,7 @@ public class RabbitPaymentEventPublisherAdapter implements PaymentEventPublisher
         paymentEventRabbitProducer.send(
                 rabbitProperties.getExchange().getPayment(),
                 rabbitProperties.getRoutingKey().getPaymentApproved(),
-                toMessage(payment)
+                new EventDTO<>(PAYMENT_APPROVED_EVENT_TYPE, toMessage(payment))
         );
     }
 
@@ -39,7 +43,7 @@ public class RabbitPaymentEventPublisherAdapter implements PaymentEventPublisher
         paymentEventRabbitProducer.send(
                 rabbitProperties.getExchange().getPayment(),
                 rabbitProperties.getRoutingKey().getPaymentPending(),
-                toMessage(payment)
+                new EventDTO<>(PAYMENT_PENDING_EVENT_TYPE, toMessage(payment))
         );
     }
 
@@ -48,7 +52,7 @@ public class RabbitPaymentEventPublisherAdapter implements PaymentEventPublisher
         paymentEventRabbitProducer.send(
                 rabbitProperties.getExchange().getPayment(),
                 rabbitProperties.getRoutingKey().getPaymentFailed(),
-                toMessage(payment)
+                new EventDTO<>(PAYMENT_FAILED_EVENT_TYPE, toMessage(payment))
         );
     }
 

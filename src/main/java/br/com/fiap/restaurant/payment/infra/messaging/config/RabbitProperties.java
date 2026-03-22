@@ -44,7 +44,9 @@ public class RabbitProperties {
 
     public static class Exchange {
         private String order;
+        private String orderDl;
         private String payment;
+        private String paymentDl;
 
         public String getOrder() {
             return order;
@@ -60,6 +62,22 @@ public class RabbitProperties {
 
         public void setPayment(String payment) {
             this.payment = payment;
+        }
+
+        public String getOrderDl() {
+            return orderDl;
+        }
+
+        public void setOrderDl(String orderDl) {
+            this.orderDl = orderDl;
+        }
+
+        public String getPaymentDl() {
+            return paymentDl;
+        }
+
+        public void setPaymentDl(String paymentDl) {
+            this.paymentDl = paymentDl;
         }
     }
 
