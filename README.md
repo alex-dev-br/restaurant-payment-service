@@ -61,7 +61,7 @@ infra
  ├── observability
  ├── persistence
  └── scheduler
-````
+```
 
 ---
 
@@ -384,9 +384,9 @@ app:
     retry:
       scheduler:
         enabled: true
-        fixed-delay-ms: 30000
+        fixed-delay-ms: 5000
       policy:
-        max-attempts: 3
+        max-attempts: 10
         publish-pending-on-retry-failure: false
 ```
 
