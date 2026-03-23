@@ -72,7 +72,7 @@ infra
 ```mermaid
 flowchart LR
     OrderService -->|order.created| PaymentService
-    PaymentService -->|HTTP| Procpag
+    PaymentService -->|Gateway| Procpag
     PaymentService -->|persistência| PostgreSQL
     PaymentService -->|grava evento| Outbox[(payment_outbox)]
     Outbox -->|publisher| RabbitMQ
