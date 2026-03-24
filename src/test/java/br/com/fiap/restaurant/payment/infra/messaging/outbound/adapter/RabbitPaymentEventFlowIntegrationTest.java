@@ -19,6 +19,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.amqp.core.AmqpAdmin;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -68,6 +69,9 @@ class RabbitPaymentEventFlowIntegrationTest extends AbstractMessagingIntegration
 
     @Autowired
     private SpringDataPaymentOutboxRepository springDataPaymentOutboxRepository;
+
+    @Value("${app.payment.retry.policy.max-attempts}")
+    private int maxRetryAttempts;
 
     @MockitoBean
     private ExternalPaymentProcessorGateway externalPaymentProcessorGateway;
@@ -198,7 +202,7 @@ class RabbitPaymentEventFlowIntegrationTest extends AbstractMessagingIntegration
                 PaymentStatus.PENDING,
                 OffsetDateTime.now().minusMinutes(2),
                 OffsetDateTime.now().minusMinutes(2),
-                2,
+                maxRetryAttempts - 1,
                 OffsetDateTime.now().minusMinutes(1),
                 OffsetDateTime.now().minusSeconds(1)
         );

@@ -63,6 +63,9 @@ public abstract class AbstractPaymentE2ETest extends AbstractMessagingIntegratio
     @Value("${app.rabbit.queue.payment-failed-debug}")
     protected String paymentFailedDebugQueue;
 
+    @Value("${app.payment.retry.policy.max-attempts}")
+    protected int maxRetryAttempts;
+
     @Autowired
     protected RabbitTemplate rabbitTemplate;
 

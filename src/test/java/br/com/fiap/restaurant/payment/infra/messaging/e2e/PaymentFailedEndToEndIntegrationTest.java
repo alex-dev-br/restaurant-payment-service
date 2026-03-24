@@ -23,9 +23,9 @@ class PaymentFailedEndToEndIntegrationTest extends AbstractPaymentE2ETest {
 
     @Test
     void shouldMarkPaymentAsFailedAfterMaxRetryAttemptsAndPublishFailedEvent() {
-        processorWillReturnPending();
-        processorWillReturnPending();
-        processorWillReturnPending();
+        for (int i = 0; i < maxRetryAttempts; i++) {
+            processorWillReturnPending();
+        }
 
         TestOrderData orderData = newOrderData(new BigDecimal("180.00"));
 
@@ -39,22 +39,24 @@ class PaymentFailedEndToEndIntegrationTest extends AbstractPaymentE2ETest {
         assertThat(initialPendingPayload).contains("\"orderId\":" + orderData.orderId());
         assertThat(initialPendingPayload).contains("\"status\":\"PENDING\"");
 
-        triggerRetryCycle();
+        for (int expectedRetryCount = 2; expectedRetryCount < maxRetryAttempts; expectedRetryCount++) {
+            triggerRetryCycle();
 
-        awaitPaymentStatus(orderData.orderId(), "PENDING");
-        awaitRetryCount(orderData.orderId(), 2);
+            awaitPaymentStatus(orderData.orderId(), "PENDING");
+            awaitRetryCount(orderData.orderId(), expectedRetryCount);
+        }
 
         triggerRetryCycle();
 
         awaitPaymentStatus(orderData.orderId(), "FAILED");
-        awaitRetryCount(orderData.orderId(), 3);
+        awaitRetryCount(orderData.orderId(), maxRetryAttempts);
 
         Map<String, Object> paymentRow = findPaymentRow(orderData.orderId());
 
         assertThat(((Number) paymentRow.get("order_id")).longValue()).isEqualTo(orderData.orderId());
         assertThat(paymentRow.get("client_id").toString()).isEqualTo(orderData.clientId().toString());
         assertThat(paymentRow.get("status")).isEqualTo("FAILED");
-        assertThat(((Number) paymentRow.get("retry_count")).intValue()).isEqualTo(3);
+        assertThat(((Number) paymentRow.get("retry_count")).intValue()).isEqualTo(maxRetryAttempts);
         assertThat(paymentRow.get("last_retry_at")).isNotNull();
         assertThat(paymentRow.get("next_retry_at")).isNull();
         assertThat(new BigDecimal(paymentRow.get("amount").toString())).isEqualByComparingTo("180.00");
